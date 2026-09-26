@@ -17,14 +17,28 @@ no history counts as exactly average.
 
 ## Setup (Windows)
 
+The virtual environment lives outside the repo, in `C:\python\pip_envs`.
+
+Once:
+
 ```bat
 cd C:\python
 git clone https://github.com/sbertazz/qet_football.git
-cd qet_football
+python -m venv C:\python\pip_envs\qet_football_env
+C:\python\pip_envs\qet_football_env\Scripts\activate
+cd C:\python\qet_football
 pip install -r requirements.txt
 ```
 
-No install of the project itself: run it from this folder with `python qet.py`.
+Each time:
+
+```bat
+C:\python\pip_envs\qet_football_env\Scripts\activate
+cd C:\python\qet_football
+python qet.py ratings
+```
+
+The project itself is not installed: run it from the repo folder with `python qet.py`.
 
 ## Match data
 
