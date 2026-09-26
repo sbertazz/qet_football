@@ -28,14 +28,32 @@ pip install -e .[dev]
 
 ## Match data
 
-One row per match:
+Two layouts are accepted, detected automatically.
 
-| date       | team_a                          | team_b                           | goals_a | goals_b |
-|------------|---------------------------------|----------------------------------|---------|---------|
-| 2026-01-08 | Marco;Luca;Stefano;Paolo;...    | Davide;Matteo;Simone;Fabio;...   | 7       | 5       |
+**Blocks** (how our sheet is written): for each match, a header row with the
+two team labels and the date (day/month/year), numbered players, then the score.
+Blank rows in between are fine.
 
-Players are separated by `;`. Names are case-insensitive (`marco` = `Marco`).
-See `data/sample_matches.csv`.
+```
+Whites:,Bibs:,08/09/26
+1. Hamza,1. Med,
+2. Stefano,2. Alex,
+...
+6. Hasnain,6. Ayman,
+,,
+12,12,
+```
+
+The left column is team A, the right team B. Numbering, hidden characters and
+upper/lower case in names are cleaned up automatically. A name with `+` (e.g.
+`Ayman+1`) is a guest: counted as an average player, never rated.
+
+**Table**: one row per match, players separated by `;`
+(see `data/sample_matches.csv`):
+
+| date       | team_a                       | team_b                         | goals_a | goals_b |
+|------------|------------------------------|--------------------------------|---------|---------|
+| 2026-01-08 | Marco;Luca;Stefano;...       | Davide;Matteo;Simone;...       | 7       | 5       |
 
 The source can be:
 - a local CSV, e.g. `data/matches.csv` (the default; git-ignored), or

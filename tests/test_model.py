@@ -1,7 +1,7 @@
 import pytest
 
 from qet_football import Match, RatingModel, balance_teams, load_matches
-from qet_football.data import parse_team, sheets_csv_url
+from qet_football.data import normalize_name, parse_team, sheets_csv_url
 
 SAMPLE = "data/sample_matches.csv"
 
@@ -67,3 +67,36 @@ def test_balance_finds_best_split_and_respects_constraints():
 def test_balance_counts_all_splits():
     model = RatingModel()
     assert len(balance_teams([f"P{i}" for i in range(12)], model, top=10_000)) == 462
+
+
+BLOCKS = "tests/data/blocks.csv"
+
+
+def test_load_block_format():
+    matches = load_matches(BLOCKS)
+    assert len(matches) == 2
+    first, second = matches
+    assert first.date == "2026-09-08" and second.date == "2026-09-15"
+    assert first.team_a == ("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot")
+    assert first.team_b[4] == "Kilo"  # no numbering or hidden characters left
+    assert (first.goals_a, first.goals_b) == (12, 10)
+    assert second.team_a[1] == "Bravo+1"
+    assert second.team_b[2] == "India"  # case normalized
+
+
+def test_normalize_strips_numbering_and_invisible_chars():
+    assert normalize_name("3. ⁠hasnain ") == "Hasnain"
+
+
+def test_guests_are_not_rated():
+    model = RatingModel().fit(load_matches(BLOCKS))
+    assert "Bravo+1" not in model.ratings
+    assert model.rating("Bravo+1") == 0.0
+    assert "Bravo" in model.ratings
+
+
+def test_block_without_score_is_an_error(tmp_path):
+    bad = tmp_path / "bad.csv"
+    bad.write_text("Whites:,Bibs:,01/09/26\n1. A,1. B,\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="no score"):
+        load_matches(str(bad))

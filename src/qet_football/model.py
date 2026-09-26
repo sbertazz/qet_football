@@ -7,7 +7,7 @@ versus an average player. For a match, the expected goal difference is
 
 Ratings are fitted with ridge regression, i.e. a Gaussian prior centred on 0:
 with few matches, players are pulled towards "average", and unknown players
-are rated exactly 0. The residual spread gives win/draw/loss probabilities.
+are rated exactly 0, as are guests. The residual spread gives win/draw/loss probabilities.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .data import Match, normalize_name
+from .data import Match, is_guest, normalize_name
 
 # Floor on goal-difference std dev: with little data the fitted residuals are
 # too optimistic, and a 6v6 game is noisy.
@@ -46,15 +46,20 @@ class RatingModel:
         self.sigma = MIN_SIGMA
 
     def fit(self, matches: Sequence[Match]) -> RatingModel:
-        players = sorted({p for m in matches for p in (*m.team_a, *m.team_b)})
+        players = sorted(
+            {p for m in matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
+        )
         index = {p: i for i, p in enumerate(players)}
         X = np.zeros((len(matches), len(players)))
         y = np.array([m.goal_diff for m in matches], dtype=float)
         for row, m in enumerate(matches):
+            # Guests have no column: they count as an average (0) player.
             for p in m.team_a:
-                X[row, index[p]] += 1
+                if p in index:
+                    X[row, index[p]] += 1
             for p in m.team_b:
-                X[row, index[p]] -= 1
+                if p in index:
+                    X[row, index[p]] -= 1
 
         w = np.linalg.solve(X.T @ X + self.alpha * np.eye(len(players)), X.T @ y)
         self.ratings = dict(zip(players, w.tolist()))
