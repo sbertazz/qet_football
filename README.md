@@ -21,10 +21,10 @@ no history counts as exactly average.
 cd C:\python
 git clone https://github.com/sbertazz/qet_football.git
 cd qet_football
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .[dev]
+pip install -r requirements.txt
 ```
+
+No install of the project itself: run it from this folder with `python qet.py`.
 
 ## Match data
 
@@ -59,21 +59,21 @@ The source can be:
 - a local CSV, e.g. `data/matches.csv` (the default; git-ignored), or
 - a Google Sheets link, if the sheet is shared as "Anyone with the link can view".
 
-Pass it with `--data`, or set it once with `set QET_DATA=<path or link>`.
+Pass it with `--data` (before the command, e.g. `python qet.py --data <link> ratings`), or set it once with `set QET_DATA=<path or link>`.
 
 ## Usage
 
 ```bat
-qet ratings
-qet predict --a "Marco,Luca,Stefano,Paolo,Andrea,Giorgio" --b "Davide,Matteo,Simone,Fabio,Nicola,Alberto"
-qet balance "Marco,Luca,Stefano,Paolo,Andrea,Giorgio,Davide,Matteo,Simone,Fabio,Nicola,Enrico"
-qet balance "..." --top 5 --together "Marco,Luca" --apart "Andrea,Paolo"
+python qet.py ratings
+python qet.py predict --a "Marco,Luca,Stefano,Paolo,Andrea,Giorgio" --b "Davide,Matteo,Simone,Fabio,Nicola,Alberto"
+python qet.py balance "Marco,Luca,Stefano,Paolo,Andrea,Giorgio,Davide,Matteo,Simone,Fabio,Nicola,Enrico"
+python qet.py balance "..." --top 5 --together "Marco,Luca" --apart "Andrea,Paolo"
 ```
 
 `--alpha` (default 3) controls how cautious the ratings are: higher values keep
 everyone closer to average, lower values trust the results more.
 
-Try it on the sample data: `qet --data data/sample_matches.csv ratings`.
+Try it on the sample data: `python qet.py --data data/sample_matches.csv ratings`.
 
 ## Tests
 

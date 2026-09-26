@@ -9,5 +9,6 @@ Match predictor and team balancer for a 6v6 friends' football group. See README.
 
 ## Commands
 
-- Install: `pip install -e .[dev]`
+- Setup: `pip install -r requirements.txt` (the project is not installed as a package)
+- Run: `python qet.py <command>` from the repo root
 - Tests: `pytest`

@@ -1,8 +1,8 @@
 """Command line interface.
 
-    qet ratings
-    qet predict --a "Marco,Luca,..." --b "Davide,Matteo,..."
-    qet balance "Marco,Luca,Davide,..." [--together "Marco,Luca"] [--apart "A,B"]
+    python qet.py ratings
+    python qet.py predict --a "Marco,Luca,..." --b "Davide,Matteo,..."
+    python qet.py balance "Marco,Luca,Davide,..." [--together "Marco,Luca"] [--apart "A,B"]
 
 The data source is --data, else $QET_DATA, else data/matches.csv.
 """
@@ -68,7 +68,7 @@ def cmd_balance(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="qet", description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(prog="python qet.py", description=__doc__.split("\n\n")[0])
     parser.add_argument("--data", help="CSV path or Google Sheets link")
     parser.add_argument("--alpha", type=float, default=3.0,
                         help="shrinkage towards average; higher = more cautious ratings")

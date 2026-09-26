@@ -1,0 +1,3 @@
+numpy
+pandas
+pytest  # only needed to run the tests
