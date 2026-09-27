@@ -88,6 +88,26 @@ def sheets_csv_url(url: str) -> str:
     return export + (f"&gid={gid.group(1)}" if gid else "")
 
 
+def load_scores(source: str) -> dict[str, float]:
+    """Manual 1-10 ratings: a CSV with a 'player' (or 'name') and a 'rating' column."""
+    df = pd.read_csv(sheets_csv_url(source), dtype=str, keep_default_na=False,
+                     encoding="utf-8-sig")
+    df.columns = [c.strip().lower() for c in df.columns]
+    name_col = next((c for c in ("player", "name") if c in df.columns), None)
+    if name_col is None or "rating" not in df.columns:
+        raise ValueError(f"need 'player' and 'rating' columns; found {list(df.columns)}")
+    scores = {}
+    for name, value in zip(df[name_col], df["rating"]):
+        name, value = normalize_name(name), value.strip()
+        if not name or not value:
+            continue
+        score = float(value)
+        if not 1 <= score <= 10:
+            raise ValueError(f"rating for {name} must be 1-10, got {value}")
+        scores[name] = score
+    return scores
+
+
 def load_matches(source: str) -> list[Match]:
     df = pd.read_csv(sheets_csv_url(source), header=None, dtype=str,
                      keep_default_na=False, encoding="utf-8-sig")

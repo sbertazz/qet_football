@@ -75,6 +75,23 @@ The source can be:
 
 Pass it with `--data` (before the command, e.g. `python qet.py --data <link> ratings`), or set it once with `set QET_DATA=<path or link>`.
 
+## Manual ratings (optional)
+
+`data/player_ratings.csv` (git-ignored) gives your own 1-10 rating of players:
+
+```
+player,rating
+Alex,7
+Madhu,3
+```
+
+These set each player's starting point: above or below average according to
+your rating. Match results then adjust from there, and as more games are
+recorded they take over. How many goals one rating point is worth is also
+learned from the matches (shown when you run a command). Players you don't rate
+start at the average of the ratings you gave. Use another file with
+`--ratings <path>`.
+
 ## Usage
 
 ```bat

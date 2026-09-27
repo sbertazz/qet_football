@@ -5,6 +5,8 @@
     python qet.py balance "Marco,Luca,Davide,..." [--together "Marco,Luca"] [--apart "A,B"]
 
 The data source is --data, else $QET_DATA, else data/matches.csv.
+Manual 1-10 ratings are read from --ratings, else $QET_RATINGS, else
+data/player_ratings.csv if it exists.
 """
 
 from __future__ import annotations
@@ -13,10 +15,11 @@ import argparse
 import os
 
 from .balance import balance_teams
-from .data import load_matches, normalize_name
+from .data import load_matches, load_scores, normalize_name
 from .model import RatingModel
 
 DEFAULT_DATA = "data/matches.csv"
+DEFAULT_RATINGS = "data/player_ratings.csv"
 
 
 def _names(text: str) -> list[str]:
@@ -26,15 +29,25 @@ def _names(text: str) -> list[str]:
 def _load_model(args: argparse.Namespace) -> RatingModel:
     source = args.data or os.environ.get("QET_DATA") or DEFAULT_DATA
     matches = load_matches(source)
-    print(f"Fitted on {len(matches)} matches from {source}\n")
-    return RatingModel(alpha=args.alpha).fit(matches)
+    ratings_source = args.ratings or os.environ.get("QET_RATINGS")
+    if not ratings_source and os.path.exists(DEFAULT_RATINGS):
+        ratings_source = DEFAULT_RATINGS
+    scores = load_scores(ratings_source) if ratings_source else {}
+    model = RatingModel(alpha=args.alpha).fit(matches, scores)
+    print(f"Fitted on {len(matches)} matches from {source}")
+    if scores:
+        print(f"Using {len(scores)} manual ratings from {ratings_source} "
+              f"(1 point = {model.beta:.2f} goals)")
+    print()
+    return model
 
 
 def cmd_ratings(args: argparse.Namespace) -> None:
     model = _load_model(args)
-    print(f"{'Player':<20}{'Rating':>8}{'Games':>7}")
-    for player, rating, games in model.table():
-        print(f"{player:<20}{rating:>+8.2f}{games:>7}")
+    print(f"{'Player':<20}{'Rating':>8}{'Games':>7}{'Yours':>7}")
+    for player, rating, games, score in model.table():
+        yours = f"{score:g}" if score is not None else "-"
+        print(f"{player:<20}{rating:>+8.2f}{games:>7}{yours:>7}")
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
@@ -70,6 +83,7 @@ def cmd_balance(args: argparse.Namespace) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python qet.py", description=__doc__.split("\n\n")[0])
     parser.add_argument("--data", help="CSV path or Google Sheets link")
+    parser.add_argument("--ratings", help="CSV of manual 1-10 ratings (player,rating)")
     parser.add_argument("--alpha", type=float, default=3.0,
                         help="shrinkage towards average; higher = more cautious ratings")
     sub = parser.add_subparsers(dest="command", required=True)

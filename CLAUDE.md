@@ -23,6 +23,8 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   Pasted names contain invisible characters (U+2060); the loader strips them.
 - Guests are written as `Name+1`: they count as an average player and are never rated.
 - On the user's machine: `data\matches.csv` (CSV export) or the sheet link via `--data` / `QET_DATA`.
+- Manual 1-10 ratings from the user: `data/player_ratings.csv` (`player,rating`), git-ignored
+  (opinions about friends; the repo is public). Loaded by default if present, or `--ratings`.
 - Cloud sessions cannot reach docs.google.com (network policy): ask the user to upload the CSV.
 
 ## Code
@@ -30,14 +32,18 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - `qet.py`: entry point. `qet_football/cli.py`: commands `ratings`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),
-  win/draw/loss from a normal on goal difference (sigma floor 2.0).
+  win/draw/loss from a normal on goal difference (sigma floor 2.0). Manual ratings set each
+  player's prior mean = beta * (score - mean score); beta (goals per point) is fitted jointly,
+  pulled towards BETA_PRIOR=0.15 with BETA_PENALTY=20.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names).
 
 ## Status
 
-- Last updated: 2026-09-26.
-- Built: ratings, match predictor, team balancer, block-layout loader. 12 tests passing.
-- Data: 4 matches (Sept 2026), ~15 rated players: too little for meaningful ratings yet.
+- Last updated: 2026-09-27.
+- Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
+  as prior. 17 tests passing.
+- Data: 4 matches (Sept 2026), ~15 players; manual ratings for 4 players (fitted beta ~0.23).
+  Too little for meaningful ratings yet.
 - Next ideas (not agreed yet): keep recording matches; check prediction accuracy once there
   is more data (e.g. leave-one-out) and tune alpha.

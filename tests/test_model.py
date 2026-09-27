@@ -1,6 +1,7 @@
 import pytest
 
 from qet_football import Match, RatingModel, balance_teams, load_matches
+from qet_football.data import load_scores
 from qet_football.data import normalize_name, parse_team, sheets_csv_url
 
 SAMPLE = "data/sample_matches.csv"
@@ -100,3 +101,45 @@ def test_block_without_score_is_an_error(tmp_path):
     bad.write_text("Whites:,Bibs:,01/09/26\n1. A,1. B,\n", encoding="utf-8")
     with pytest.raises(ValueError, match="no score"):
         load_matches(str(bad))
+
+
+def test_load_scores_accepts_player_or_name_header(tmp_path):
+    for header in ("player", "name"):
+        f = tmp_path / f"{header}.csv"
+        f.write_text(f"{header},rating\n ⁠alpha,7\nBravo,3\nCharlie,\n", encoding="utf-8")
+        assert load_scores(str(f)) == {"Alpha": 7.0, "Bravo": 3.0}
+
+
+def test_load_scores_rejects_out_of_range(tmp_path):
+    f = tmp_path / "r.csv"
+    f.write_text("player,rating\nAlpha,11\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="1-10"):
+        load_scores(str(f))
+
+
+def test_no_scores_matches_plain_model():
+    matches = load_matches(SAMPLE)
+    plain = RatingModel().fit(matches)
+    empty = RatingModel().fit(matches, {})
+    assert plain.ratings == pytest.approx(empty.ratings)
+    assert empty.beta == 0.0
+
+
+def test_scores_set_the_starting_point():
+    # With no matches, ratings are exactly beta * (score - mean score).
+    model = RatingModel().fit([], {"High": 9, "Low": 3, "Mid": 6})
+    assert model.rating("High") > model.rating("Mid") > model.rating("Low")
+    assert model.rating("Mid") == pytest.approx(0.0)
+    assert model.rating("Nobody") == 0.0
+
+
+def test_scores_that_agree_with_results_increase_beta():
+    # The team with more highly rated players always wins by 3.
+    good, bad = [f"G{i}" for i in range(6)], [f"B{i}" for i in range(6)]
+    matches = []
+    for k in range(8):
+        g = good[k % 6:] + good[: k % 6]
+        matches.append(Match((*g[:4], *bad[:2]), (*g[4:], *bad[2:]), 6, 3))
+    scores = {**{p: 8 for p in good}, **{p: 3 for p in bad}}
+    model = RatingModel().fit(matches, scores)
+    assert model.beta > 0.15
