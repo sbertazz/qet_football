@@ -177,41 +177,7 @@ def test_scores_that_agree_with_results_increase_beta():
     assert model.beta > 0.15
 
 
-def test_search_never_worsens_loo_error():
-    from qet_football.search import loo_error, search_ratings
-
-    matches = load_matches(SAMPLE)
-    players = sorted(RatingModel().fit(matches).games)
-    start = {"Andrea": 8, "Fabio": 3}
-    scores, before, after = search_ratings(matches, start, players, steps=50)
-    assert after <= before
-    assert after == pytest.approx(loo_error(matches, scores))
-    assert set(scores) == set(players)
-    assert all(1 <= v <= 10 for v in scores.values())
-    assert scores == search_ratings(matches, start, players, steps=50)[0]  # same seed, same result
-
-
-def test_search_command_writes_versions_used_by_other_commands(tmp_path, monkeypatch, capsys):
-    import shutil
-
-    from qet_football.cli import main
-
-    (tmp_path / "data").mkdir()
-    shutil.copy(SAMPLE, tmp_path / "data" / "matches.csv")
-    (tmp_path / "data" / "player_ratings.csv").write_text("player,mine\nAndrea,8\n")
-    monkeypatch.chdir(tmp_path)
-
-    main(["search", "--steps", "20"])
-    lines = (tmp_path / "data" / "searched_ratings.csv").read_text().splitlines()
-    assert lines[0] == "# searched on 6 matches"
-    assert lines[1] == "player,mine_searched,all5_searched"
-
-    capsys.readouterr()
-    main(["--version", "all5_searched", "predict", "--a", "Marco", "--b", "Luca"])
-    assert "Using ratings: all5_searched" in capsys.readouterr().out
-
-    # One more match: the saved search is stale.
-    with open(tmp_path / "data" / "matches.csv", "a") as f:
-        f.write("2026-02-19,Marco;Luca,Davide;Matteo,3,2\n")
-    main(["ratings"])
-    assert "rerun `python qet.py search`" in capsys.readouterr().out
+def test_load_scores_skips_comment_lines(tmp_path):
+    f = tmp_path / "r.csv"
+    f.write_text("# my notes\nplayer,rating\nAlpha,7\n", encoding="utf-8")
+    assert load_score_versions(str(f)) == {"rating": {"Alpha": 7.0}}

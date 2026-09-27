@@ -4,31 +4,25 @@
     python qet.py predict --a "Marco,Luca,..." --b "Davide,Matteo,..."
     python qet.py balance "Marco,Luca,Davide,..." [--together "Marco,Luca"] [--apart "A,B"]
     python qet.py evaluate
-    python qet.py search
 
 The data source is --data, else $QET_DATA, else data/matches.csv.
 Manual 1-10 ratings are read from --ratings, else $QET_RATINGS, else
 data/player_ratings.csv if it exists. That file can hold several versions
 (one column each); predict/balance use --version, else the first column.
-`search` saves searched versions to data/searched_ratings.csv; when that file
-exists its columns are added as extra versions.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
-import re
 
 from .balance import balance_teams
 from .data import Match, load_matches, load_score_versions, normalize_name
 from .evaluate import leave_one_out, summarize
 from .model import RatingModel
-from .search import START_VALUE, search_ratings
 
 DEFAULT_DATA = "data/matches.csv"
 DEFAULT_RATINGS = "data/player_ratings.csv"
-DEFAULT_SEARCHED = "data/searched_ratings.csv"
 NO_RATINGS = "none"
 
 
@@ -43,37 +37,19 @@ def _load_matches(args: argparse.Namespace) -> list[Match]:
     return matches
 
 
-def _user_versions(args: argparse.Namespace) -> dict[str, dict[str, float]]:
+def _load_versions(args: argparse.Namespace) -> dict[str, dict[str, float]]:
+    """All manual rating versions, plus NO_RATINGS last."""
     source = args.ratings or os.environ.get("QET_RATINGS")
     if not source and os.path.exists(DEFAULT_RATINGS):
         source = DEFAULT_RATINGS
     versions = load_score_versions(source) if source else {}
     if versions:
         print(f"Rating versions from {source}: {', '.join(versions)}")
-    return versions
-
-
-def _searched_versions(n_matches: int) -> dict[str, dict[str, float]]:
-    if not os.path.exists(DEFAULT_SEARCHED):
-        return {}
-    versions = load_score_versions(DEFAULT_SEARCHED)
-    print(f"Searched versions from {DEFAULT_SEARCHED}: {', '.join(versions)}")
-    with open(DEFAULT_SEARCHED, encoding="utf-8") as f:
-        m = re.search(r"searched on (\d+) matches", f.readline())
-    if m and int(m.group(1)) != n_matches:
-        print(f"  warning: searched on {m.group(1)} matches, now there are {n_matches}; "
-              "rerun `python qet.py search`")
-    return versions
-
-
-def _load_versions(args: argparse.Namespace, n_matches: int) -> dict[str, dict[str, float]]:
-    """User versions, then searched versions, then NO_RATINGS."""
-    return {**_user_versions(args), **_searched_versions(n_matches), NO_RATINGS: {}}
+    return {**versions, NO_RATINGS: {}}
 
 
 def _load_model(args: argparse.Namespace) -> RatingModel:
-    matches = _load_matches(args)
-    versions = _load_versions(args, len(matches))
+    matches, versions = _load_matches(args), _load_versions(args)
     if args.version:
         name = next((v for v in versions if v.lower() == args.version.lower()), None)
         if name is None:
@@ -91,8 +67,7 @@ def _col(name: str) -> int:
 
 
 def cmd_ratings(args: argparse.Namespace) -> None:
-    matches = _load_matches(args)
-    versions = _load_versions(args, len(matches))
+    matches, versions = _load_matches(args), _load_versions(args)
     models = {v: RatingModel(alpha=args.alpha).fit(matches, s) for v, s in versions.items()}
     for v, model in models.items():
         if versions[v]:
@@ -137,8 +112,7 @@ def cmd_balance(args: argparse.Namespace) -> None:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> None:
-    matches = _load_matches(args)
-    versions = _load_versions(args, len(matches))
+    matches, versions = _load_matches(args), _load_versions(args)
     results = leave_one_out(matches, versions, alpha=args.alpha)
     print("Each match predicted from all the others (goal difference, left - right):\n")
     header = f"{'Match':<12}{'Score':>7}{'Actual':>8}" + "".join(f"{v:>{_col(v)}}" for v in results)
@@ -167,30 +141,6 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         print(f"Only {len(matches)} matches: differences between versions may just be luck.")
 
 
-def cmd_search(args: argparse.Namespace) -> None:
-    matches = _load_matches(args)
-    starts = {f"{v}_searched": scores for v, scores in _user_versions(args).items()}
-    starts[f"all{START_VALUE}_searched"] = {}
-    players = sorted(RatingModel(alpha=args.alpha).fit(matches).games)
-    print(f"Searching 1-10 ratings for {len(players)} players, {args.steps} steps each "
-          f"(unrated players start at {START_VALUE})\n")
-    found = {}
-    for name, start in starts.items():
-        scores, before, after = search_ratings(
-            matches, start, players, steps=args.steps, seed=args.seed, alpha=args.alpha
-        )
-        found[name] = scores
-        print(f"  {name:<24} leave-one-out error {before:.2f} -> {after:.2f}")
-
-    os.makedirs(os.path.dirname(DEFAULT_SEARCHED), exist_ok=True)
-    with open(DEFAULT_SEARCHED, "w", encoding="utf-8") as f:
-        f.write(f"# searched on {len(matches)} matches\n")
-        f.write(",".join(["player", *found]) + "\n")
-        for p in players:
-            f.write(",".join([p, *(f"{found[v][p]:g}" for v in found)]) + "\n")
-    print(f"\nSaved to {DEFAULT_SEARCHED}. These ratings overfit past matches by design.")
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python qet.py", description=__doc__.split("\n\n")[0])
     parser.add_argument("--data", help="CSV path or Google Sheets link")
@@ -204,11 +154,6 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("evaluate", help="compare rating versions on past matches"
                    ).set_defaults(func=cmd_evaluate)
-
-    p = sub.add_parser("search", help="search ratings that minimise leave-one-out error")
-    p.add_argument("--steps", type=int, default=1500, help="search steps per version")
-    p.add_argument("--seed", type=int, default=0, help="random seed")
-    p.set_defaults(func=cmd_search)
 
     p = sub.add_parser("predict", help="predict a match between two teams")
     p.add_argument("--a", required=True, help="team A players, comma separated")

@@ -93,7 +93,7 @@ def load_score_versions(source: str) -> dict[str, dict[str, float]]:
 
     CSV with a 'player' (or 'name') column; every other column is a version of
     the ratings (e.g. rating / ratings1, ratings2, ...). Empty cell = not rated
-    in that version. Returns {version: {player: score}} in column order.
+    in that version; lines starting with '#' are comments. Returns {version: {player: score}} in column order.
     """
     df = pd.read_csv(sheets_csv_url(source), dtype=str, keep_default_na=False,
                      encoding="utf-8-sig", comment="#")
