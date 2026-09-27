@@ -129,16 +129,16 @@ def test_load_scores_rejects_out_of_range(tmp_path):
 
 def test_leave_one_out_and_summary():
     matches = load_matches(SAMPLE)
-    versions = {"mine": {"Andrea": 9, "Fabio": 2}, "none": {}}
+    versions = {"mine": {"Andrea": 9, "Fabio": 2}, "Unadjusted": {}}
     results = leave_one_out(matches, versions)
-    assert set(results) == {"mine", "none"}
+    assert set(results) == {"mine", "Unadjusted"}
     assert all(len(preds) == len(matches) for preds in results.values())
 
     # Prediction for match 0 must not have seen match 0.
     expected = RatingModel().fit(matches[1:], {}).predict(matches[0].team_a, matches[0].team_b)
-    assert results["none"][0].goal_diff == pytest.approx(expected.goal_diff)
+    assert results["Unadjusted"][0].goal_diff == pytest.approx(expected.goal_diff)
 
-    s = summarize(matches, results["none"])
+    s = summarize(matches, results["Unadjusted"])
     assert s.mean_error >= 0
     assert 0 <= s.correct <= len(matches)
     assert 0 < s.mean_p_actual < 1
@@ -146,7 +146,7 @@ def test_leave_one_out_and_summary():
 
 def test_leave_one_out_needs_two_matches():
     with pytest.raises(ValueError):
-        leave_one_out(load_matches(SAMPLE)[:1], {"none": {}})
+        leave_one_out(load_matches(SAMPLE)[:1], {"Unadjusted": {}})
 
 
 def test_no_scores_matches_plain_model():
@@ -181,3 +181,28 @@ def test_load_scores_skips_comment_lines(tmp_path):
     f = tmp_path / "r.csv"
     f.write_text("# my notes\nplayer,rating\nAlpha,7\n", encoding="utf-8")
     assert load_score_versions(str(f)) == {"rating": {"Alpha": 7.0}}
+
+
+def test_ratings_command_puts_unadjusted_first_and_sorts_by_it(tmp_path, monkeypatch, capsys):
+    import shutil
+
+    from qet_football.cli import main
+
+    (tmp_path / "data").mkdir()
+    shutil.copy(SAMPLE, tmp_path / "data" / "matches.csv")
+    (tmp_path / "data" / "player_ratings.csv").write_text("player,mine\nFabio,10\nNewbie,9\n")
+    monkeypatch.chdir(tmp_path)
+
+    main(["ratings"])
+    lines = capsys.readouterr().out.splitlines()
+    header = next(line for line in lines if line.startswith("Player"))
+    assert header.split() == ["Player", "Unadjusted", "mine", "Games"]
+    rows = [line.split() for line in lines[lines.index(header) + 1:]]
+    unadjusted = [float(r[1]) for r in rows]
+    assert unadjusted == sorted(unadjusted, reverse=True)
+    assert "Newbie" in [r[0] for r in rows]  # rated but never played
+
+    main(["predict", "--a", "Marco", "--b", "Luca"])
+    assert "Using ratings: mine" in capsys.readouterr().out  # default stays the first manual version
+    main(["--version", "unadjusted", "predict", "--a", "Marco", "--b", "Luca"])
+    assert "Using ratings: Unadjusted" in capsys.readouterr().out

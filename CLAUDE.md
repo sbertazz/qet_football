@@ -26,12 +26,13 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - Manual 1-10 ratings from the user: `data/player_ratings.csv`, git-ignored (opinions about
   friends; the repo is public). Columns: `player` + one column per version (e.g. ratings1,
   ratings2); empty cell = unrated. Loaded by default if present, or `--ratings`;
-  predict/balance use `--version` (default: first column).
+  predict/balance use `--version` (default: first manual version, else Unadjusted).
 - Cloud sessions cannot reach docs.google.com (network policy): ask the user to upload the CSV.
 
 ## Code
 
-- `qet.py`: entry point. `qet_football/cli.py`: commands `ratings` (all versions + none),
+- `qet.py`: entry point. `qet_football/cli.py`: commands `ratings` (`Unadjusted` = matches only,
+  shown first and used for sorting, then each version),
   `evaluate`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),
@@ -47,12 +48,12 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 - Last updated: 2026-09-27.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate`. 21 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate`. 22 tests passing.
 - Data: 4 matches (Sept 2026), ~15 players; 3 manual rating versions (4-5 players each;
   ratings1 fitted beta ~0.23).
   Too little for meaningful ratings yet.
 - Leave-one-out on 4 matches: user's ratings1 0.90 goals avg error, ratings2/3 (Ayman=8) 1.20,
-  none 1.29.
+  Unadjusted 1.29.
 - Tried and removed (2026-09-27): a `search` command hill-climbing 1-10 ratings to minimise
   leave-one-out error. It reached ~0.03 error but overfits (a simulation showed it predicts
   new matches worse than honest ratings, and searches from different starts disagreed

@@ -23,7 +23,7 @@ from .model import RatingModel
 
 DEFAULT_DATA = "data/matches.csv"
 DEFAULT_RATINGS = "data/player_ratings.csv"
-NO_RATINGS = "none"
+NO_RATINGS = "Unadjusted"  # match results only, no manual ratings
 
 
 def _names(text: str) -> list[str]:
@@ -38,14 +38,14 @@ def _load_matches(args: argparse.Namespace) -> list[Match]:
 
 
 def _load_versions(args: argparse.Namespace) -> dict[str, dict[str, float]]:
-    """All manual rating versions, plus NO_RATINGS last."""
+    """NO_RATINGS first, then all manual rating versions."""
     source = args.ratings or os.environ.get("QET_RATINGS")
     if not source and os.path.exists(DEFAULT_RATINGS):
         source = DEFAULT_RATINGS
     versions = load_score_versions(source) if source else {}
     if versions:
         print(f"Rating versions from {source}: {', '.join(versions)}")
-    return {**versions, NO_RATINGS: {}}
+    return {NO_RATINGS: {}, **versions}
 
 
 def _load_model(args: argparse.Namespace) -> RatingModel:
@@ -54,8 +54,8 @@ def _load_model(args: argparse.Namespace) -> RatingModel:
         name = next((v for v in versions if v.lower() == args.version.lower()), None)
         if name is None:
             raise SystemExit(f"unknown version {args.version!r}; choose from {', '.join(versions)}")
-    else:
-        name = next(iter(versions))
+    else:  # first manual version if there is one
+        name = next((v for v in versions if v != NO_RATINGS), NO_RATINGS)
     model = RatingModel(alpha=args.alpha).fit(matches, versions[name])
     detail = f" (1 point = {model.beta:.2f} goals)" if versions[name] else ""
     print(f"Using ratings: {name}{detail}\n")
@@ -73,12 +73,14 @@ def cmd_ratings(args: argparse.Namespace) -> None:
         if versions[v]:
             print(f"  {v}: {len(versions[v])} players rated, 1 point = {model.beta:.2f} goals")
     print()
-    first = next(iter(models.values()))
-    players = sorted(first.ratings, key=first.rating, reverse=True)
+    # Rated players who never played appear only in the manual versions.
+    players = {p for m in models.values() for p in m.ratings}
+    games = {p: max(m.games.get(p, 0) for m in models.values()) for p in players}
+    unadjusted = models[NO_RATINGS]
     print(f"{'Player':<20}" + "".join(f"{v:>{_col(v)}}" for v in models) + f"{'Games':>7}")
-    for p in players:
+    for p in sorted(players, key=lambda p: (-unadjusted.rating(p), p)):
         cells = "".join(f"{m.rating(p):>+{_col(v)}.2f}" for v, m in models.items())
-        print(f"{p:<20}{cells}{first.games.get(p, 0):>7}")
+        print(f"{p:<20}{cells}{games[p]:>7}")
 
 
 def cmd_predict(args: argparse.Namespace) -> None:

@@ -95,9 +95,10 @@ recorded they take over. How many goals one rating point is worth is also
 learned from the matches. Players you don't rate start at the average of the
 ratings you gave. Use another file with `--ratings <path>`.
 
-- `ratings` shows the model's ratings for every version, plus `none` (matches only).
+- `ratings` shows the model's ratings for `Unadjusted` (match results only, sorted by it)
+  and for every version.
 - `evaluate` predicts each past match from all the others, for every version and
-  `none`, and shows which version predicts best. With few matches the winner may
+  `Unadjusted`, and shows which version predicts best. With few matches the winner may
   just be luck.
 - `predict` and `balance` use the first version, or pick one with `--version ratings2`.
 
