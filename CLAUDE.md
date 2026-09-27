@@ -27,12 +27,15 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   friends; the repo is public). Columns: `player` + one column per version (e.g. ratings1,
   ratings2); empty cell = unrated. Loaded by default if present, or `--ratings`;
   predict/balance use `--version` (default: first column).
+- `data/searched_ratings.csv` (git-ignored): output of `search`; first line
+  `# searched on N matches`, then `player,<version>_searched,...,all5_searched`. Loaded as
+  extra versions when present.
 - Cloud sessions cannot reach docs.google.com (network policy): ask the user to upload the CSV.
 
 ## Code
 
 - `qet.py`: entry point. `qet_football/cli.py`: commands `ratings` (all versions + none),
-  `evaluate`, `predict`, `balance`.
+  `evaluate`, `search`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),
   win/draw/loss from a normal on goal difference (sigma floor 2.0). Manual ratings set each
@@ -40,16 +43,19 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   pulled towards BETA_PRIOR=0.15 with BETA_PENALTY=20.
 - `qet_football/evaluate.py`: leave-one-out comparison of rating versions (avg goal error,
   outcome right, avg probability of the actual outcome).
+- `qet_football/search.py`: hill-climb 1-10 ratings to minimise leave-one-out error. User
+  knows this overfits (shown with a simulation) and wants it anyway, for exploring.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names).
 
 ## Status
 
-- Last updated: 2026-09-27.
+- Last updated: 2026-09-28.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate`. 20 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate`, `search`. 22 tests passing.
 - Data: 4 matches (Sept 2026), ~15 players; manual ratings for 4 players (fitted beta ~0.23).
   Too little for meaningful ratings yet.
-- Leave-one-out on 4 matches: user's ratings 0.90 goals avg error vs 1.29 without.
+- Leave-one-out on 4 matches: user's ratings1 0.90 goals avg error, ratings2/3 (Ayman=8) 1.20,
+  none 1.29; searched versions ~0.05 (overfit by design).
 - Next ideas (not agreed yet): keep recording matches; user to compare rating versions with
   `evaluate`; tune alpha once there are ~15+ matches.

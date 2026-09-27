@@ -96,7 +96,7 @@ def load_score_versions(source: str) -> dict[str, dict[str, float]]:
     in that version. Returns {version: {player: score}} in column order.
     """
     df = pd.read_csv(sheets_csv_url(source), dtype=str, keep_default_na=False,
-                     encoding="utf-8-sig")
+                     encoding="utf-8-sig", comment="#")
     df.columns = [c.strip() for c in df.columns]
     name_col = next((c for c in df.columns if c.lower() in ("player", "name")), None)
     version_cols = [c for c in df.columns if c != name_col and not c.startswith("Unnamed")]

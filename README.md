@@ -101,11 +101,25 @@ ratings you gave. Use another file with `--ratings <path>`.
   just be luck.
 - `predict` and `balance` use the first version, or pick one with `--version ratings2`.
 
+## Searched ratings (for fun: they overfit)
+
+`python qet.py search` hill-climbs 1-10 ratings for every player to minimise
+the leave-one-out error: one search starting from each of your versions
+(unrated players start at 5), plus one starting from everybody at 5. Results
+go to `data/searched_ratings.csv` (git-ignored) as `<version>_searched` and
+`all5_searched`, and every other command then includes them as extra versions.
+
+Because they are tuned on the very test `evaluate` uses, their `evaluate`
+score is not honest: they explain past matches but are not expected to predict
+new ones better. Rerun `search` after adding matches (commands warn when the
+saved search is out of date). Options: `--steps` (default 1500), `--seed`.
+
 ## Usage
 
 ```bat
 python qet.py ratings
 python qet.py evaluate
+python qet.py search
 python qet.py --version ratings2 predict --a "Marco,Luca,Stefano,Paolo,Andrea,Giorgio" --b "Davide,Matteo,Simone,Fabio,Nicola,Alberto"
 python qet.py balance "Marco,Luca,Stefano,Paolo,Andrea,Giorgio,Davide,Matteo,Simone,Fabio,Nicola,Enrico"
 python qet.py balance "..." --top 5 --together "Marco,Luca" --apart "Andrea,Paolo"
