@@ -77,26 +77,36 @@ Pass it with `--data` (before the command, e.g. `python qet.py --data <link> rat
 
 ## Manual ratings (optional)
 
-`data/player_ratings.csv` (git-ignored) gives your own 1-10 rating of players:
+`data/player_ratings.csv` (git-ignored) gives your own 1-10 rating of players.
+It can hold several versions, one column each (any column names):
 
 ```
-player,rating
-Alex,7
-Madhu,3
+player,ratings1,ratings2,ratings3
+Hamza,9,8,9
+Madhu,3,4,
+Alex,7,7,6
 ```
 
-These set each player's starting point: above or below average according to
+An empty cell means "not rated in that version". A single `rating` column works too.
+
+Ratings set each player's starting point: above or below average according to
 your rating. Match results then adjust from there, and as more games are
 recorded they take over. How many goals one rating point is worth is also
-learned from the matches (shown when you run a command). Players you don't rate
-start at the average of the ratings you gave. Use another file with
-`--ratings <path>`.
+learned from the matches. Players you don't rate start at the average of the
+ratings you gave. Use another file with `--ratings <path>`.
+
+- `ratings` shows the model's ratings for every version, plus `none` (matches only).
+- `evaluate` predicts each past match from all the others, for every version and
+  `none`, and shows which version predicts best. With few matches the winner may
+  just be luck.
+- `predict` and `balance` use the first version, or pick one with `--version ratings2`.
 
 ## Usage
 
 ```bat
 python qet.py ratings
-python qet.py predict --a "Marco,Luca,Stefano,Paolo,Andrea,Giorgio" --b "Davide,Matteo,Simone,Fabio,Nicola,Alberto"
+python qet.py evaluate
+python qet.py --version ratings2 predict --a "Marco,Luca,Stefano,Paolo,Andrea,Giorgio" --b "Davide,Matteo,Simone,Fabio,Nicola,Alberto"
 python qet.py balance "Marco,Luca,Stefano,Paolo,Andrea,Giorgio,Davide,Matteo,Simone,Fabio,Nicola,Enrico"
 python qet.py balance "..." --top 5 --together "Marco,Luca" --apart "Andrea,Paolo"
 ```

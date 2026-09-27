@@ -1,7 +1,8 @@
 import pytest
 
 from qet_football import Match, RatingModel, balance_teams, load_matches
-from qet_football.data import load_scores
+from qet_football.data import load_score_versions
+from qet_football.evaluate import leave_one_out, summarize
 from qet_football.data import normalize_name, parse_team, sheets_csv_url
 
 SAMPLE = "data/sample_matches.csv"
@@ -104,17 +105,48 @@ def test_block_without_score_is_an_error(tmp_path):
 
 
 def test_load_scores_accepts_player_or_name_header(tmp_path):
-    for header in ("player", "name"):
+    for header in ("player", "Name"):
         f = tmp_path / f"{header}.csv"
-        f.write_text(f"{header},rating\n ⁠alpha,7\nBravo,3\nCharlie,\n", encoding="utf-8")
-        assert load_scores(str(f)) == {"Alpha": 7.0, "Bravo": 3.0}
+        f.write_text(f"{header},rating\n \u2060alpha,7\nBravo,3\nCharlie,\n", encoding="utf-8")
+        assert load_score_versions(str(f)) == {"rating": {"Alpha": 7.0, "Bravo": 3.0}}
+
+
+def test_load_several_versions(tmp_path):
+    f = tmp_path / "r.csv"
+    f.write_text("player,ratings1,ratings2\nAlpha,7,8\nBravo,,4\n", encoding="utf-8")
+    versions = load_score_versions(str(f))
+    assert list(versions) == ["ratings1", "ratings2"]
+    assert versions["ratings1"] == {"Alpha": 7.0}  # empty cell = not rated
+    assert versions["ratings2"] == {"Alpha": 8.0, "Bravo": 4.0}
 
 
 def test_load_scores_rejects_out_of_range(tmp_path):
     f = tmp_path / "r.csv"
     f.write_text("player,rating\nAlpha,11\n", encoding="utf-8")
     with pytest.raises(ValueError, match="1-10"):
-        load_scores(str(f))
+        load_score_versions(str(f))
+
+
+def test_leave_one_out_and_summary():
+    matches = load_matches(SAMPLE)
+    versions = {"mine": {"Andrea": 9, "Fabio": 2}, "none": {}}
+    results = leave_one_out(matches, versions)
+    assert set(results) == {"mine", "none"}
+    assert all(len(preds) == len(matches) for preds in results.values())
+
+    # Prediction for match 0 must not have seen match 0.
+    expected = RatingModel().fit(matches[1:], {}).predict(matches[0].team_a, matches[0].team_b)
+    assert results["none"][0].goal_diff == pytest.approx(expected.goal_diff)
+
+    s = summarize(matches, results["none"])
+    assert s.mean_error >= 0
+    assert 0 <= s.correct <= len(matches)
+    assert 0 < s.mean_p_actual < 1
+
+
+def test_leave_one_out_needs_two_matches():
+    with pytest.raises(ValueError):
+        leave_one_out(load_matches(SAMPLE)[:1], {"none": {}})
 
 
 def test_no_scores_matches_plain_model():

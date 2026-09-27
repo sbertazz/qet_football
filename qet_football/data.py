@@ -88,24 +88,33 @@ def sheets_csv_url(url: str) -> str:
     return export + (f"&gid={gid.group(1)}" if gid else "")
 
 
-def load_scores(source: str) -> dict[str, float]:
-    """Manual 1-10 ratings: a CSV with a 'player' (or 'name') and a 'rating' column."""
+def load_score_versions(source: str) -> dict[str, dict[str, float]]:
+    """Manual 1-10 ratings, one or more versions.
+
+    CSV with a 'player' (or 'name') column; every other column is a version of
+    the ratings (e.g. rating / ratings1, ratings2, ...). Empty cell = not rated
+    in that version. Returns {version: {player: score}} in column order.
+    """
     df = pd.read_csv(sheets_csv_url(source), dtype=str, keep_default_na=False,
                      encoding="utf-8-sig")
-    df.columns = [c.strip().lower() for c in df.columns]
-    name_col = next((c for c in ("player", "name") if c in df.columns), None)
-    if name_col is None or "rating" not in df.columns:
-        raise ValueError(f"need 'player' and 'rating' columns; found {list(df.columns)}")
-    scores = {}
-    for name, value in zip(df[name_col], df["rating"]):
-        name, value = normalize_name(name), value.strip()
-        if not name or not value:
-            continue
-        score = float(value)
-        if not 1 <= score <= 10:
-            raise ValueError(f"rating for {name} must be 1-10, got {value}")
-        scores[name] = score
-    return scores
+    df.columns = [c.strip() for c in df.columns]
+    name_col = next((c for c in df.columns if c.lower() in ("player", "name")), None)
+    version_cols = [c for c in df.columns if c != name_col and not c.startswith("Unnamed")]
+    if name_col is None or not version_cols:
+        raise ValueError(f"need a 'player' column and rating columns; found {list(df.columns)}")
+    versions = {}
+    for col in version_cols:
+        scores = {}
+        for name, value in zip(df[name_col], df[col]):
+            name, value = normalize_name(name), value.strip()
+            if not name or not value:
+                continue
+            score = float(value)
+            if not 1 <= score <= 10:
+                raise ValueError(f"{col}: rating for {name} must be 1-10, got {value}")
+            scores[name] = score
+        versions[col] = scores
+    return versions
 
 
 def load_matches(source: str) -> list[Match]:
