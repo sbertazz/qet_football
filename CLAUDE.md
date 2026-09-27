@@ -50,7 +50,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 ## Status
 
-- Last updated: 2026-09-28.
+- Last updated: 2026-09-27.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
   as prior (multiple versions), leave-one-out `evaluate`, `search`. 22 tests passing.
 - Data: 4 matches (Sept 2026), ~15 players; manual ratings for 4 players (fitted beta ~0.23).
