@@ -18,7 +18,7 @@ import os
 
 from .balance import balance_teams
 from .data import Match, load_matches, load_score_versions, normalize_name
-from .evaluate import leave_one_out, summarize
+from .evaluate import in_sample, leave_one_out, summarize
 from .model import RatingModel
 
 DEFAULT_DATA = "data/matches.csv"
@@ -139,21 +139,30 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
         score = f"{m.goals_a}-{m.goals_b}"
         print(f"{(m.date or f'#{i + 1}'):<12}{score:>7}{m.goal_diff:>+8d}{cells}")
 
-    summaries = {v: summarize(matches, preds) for v, preds in results.items()}
     rows = [
         ("Avg error (goals)", lambda s: s.mean_error, min, lambda x: f"{x:.2f}"),
         ("Outcome right", lambda s: s.correct, max, lambda x: f"{x}/{len(matches)}"),
         ("Avg P(actual)", lambda s: s.mean_p_actual, max, lambda x: f"{x:.0%}"),
     ]
+    groups = [
+        ("Leave-one-out (each match predicted without seeing it):", results),
+        ("Training set (fitted on all matches, scored on the same matches):",
+         in_sample(matches, versions, alpha=args.alpha)),
+    ]
     print("-" * len(header))
-    for label, get, best_fn, fmt in rows:
-        best = best_fn(get(s) for s in summaries.values())
-        cells = "".join(
-            f"{fmt(get(s)) + ('*' if get(s) == best else ''):>{_col(v)}}"
-            for v, s in summaries.items()
-        )
-        print(f"{label:<27}{cells}")
-    print("\n* = best. Lower error is better; higher outcome-right and P(actual) are better.")
+    for title, preds in groups:
+        summaries = {v: summarize(matches, p) for v, p in preds.items()}
+        print(title)
+        for label, get, best_fn, fmt in rows:
+            best = best_fn(get(s) for s in summaries.values())
+            cells = "".join(
+                f"{fmt(get(s)) + ('*' if get(s) == best else ''):>{_col(v)}}"
+                for v, s in summaries.items()
+            )
+            print(f"{label:<27}{cells}")
+        print()
+    print("* = best. Lower error is better; higher outcome-right and P(actual) are better.")
+    print("Training-set error is usually lower; a big gap to leave-one-out means overfitting.")
     if len(matches) < 10:
         print(f"Only {len(matches)} matches: differences between versions may just be luck.")
 

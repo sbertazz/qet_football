@@ -1,4 +1,5 @@
-"""Compare rating versions by leave-one-out: predict each match from all the others."""
+"""Compare rating versions by leave-one-out (predict each match from all the others)
+and on the training set (fit on all matches, score on the same matches)."""
 
 from __future__ import annotations
 
@@ -43,6 +44,19 @@ def leave_one_out(
         for version, scores in versions.items():
             model = RatingModel(alpha=alpha).fit(rest, scores)
             results[version].append(model.predict(m.team_a, m.team_b))
+    return results
+
+
+def in_sample(
+    matches: Sequence[Match],
+    versions: Mapping[str, Mapping[str, float]],
+    alpha: float = 3.0,
+) -> dict[str, list[Prediction]]:
+    """{version: [prediction for match i, fitted on all matches including i]}."""
+    results = {}
+    for version, scores in versions.items():
+        model = RatingModel(alpha=alpha).fit(matches, scores)
+        results[version] = [model.predict(m.team_a, m.team_b) for m in matches]
     return results
 
 

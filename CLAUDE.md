@@ -41,7 +41,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   player's prior mean = beta * (score - mean score); beta (goals per point) is fitted jointly,
   pulled towards BETA_PRIOR=0.15 with BETA_PENALTY=20.
 - `qet_football/evaluate.py`: leave-one-out comparison of rating versions (avg goal error,
-  outcome right, avg probability of the actual outcome).
+  outcome right, avg probability of the actual outcome), plus the same on the training set.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names).
 
@@ -49,12 +49,12 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 - Last updated: 2026-09-28.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate`. 23 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set). 24 tests passing.
 - Data: 4 matches (Sept 2026), ~15 players; 3 manual rating versions (4-5 players each;
   ratings1 fitted beta ~0.23).
   Too little for meaningful ratings yet.
 - Leave-one-out on 4 matches: user's ratings1 0.90 goals avg error, ratings2/3 (Ayman=8) 1.20,
-  Unadjusted 1.29.
+  Unadjusted 1.29. Training-set errors 0.20-0.31 (big gap = expected overfitting at 4 matches).
 - Tried and removed (2026-09-27): a `search` command hill-climbing 1-10 ratings to minimise
   leave-one-out error. It reached ~0.03 error but overfits (a simulation showed it predicts
   new matches worse than honest ratings, and searches from different starts disagreed

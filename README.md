@@ -99,7 +99,8 @@ ratings you gave. Use another file with `--ratings <path>`.
   and for every version, then games played and games won (a draw counts 0.5). In the
   version columns your manual rating is shown in brackets, e.g. `+0.75 [9]`.
 - `evaluate` predicts each past match from all the others, for every version and
-  `Unadjusted`, and shows which version predicts best. With few matches the winner may
+  `Unadjusted`, and shows which version predicts best. It also shows the error on the
+  training set (fitted and scored on all matches): a big gap between the two means overfitting. With few matches the winner may
   just be luck.
 - `predict` and `balance` use the first version, or pick one with `--version ratings2`.
 

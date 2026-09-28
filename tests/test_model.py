@@ -2,7 +2,7 @@ import pytest
 
 from qet_football import Match, RatingModel, balance_teams, load_matches
 from qet_football.data import load_score_versions
-from qet_football.evaluate import leave_one_out, summarize
+from qet_football.evaluate import in_sample, leave_one_out, summarize
 from qet_football.data import normalize_name, parse_team, sheets_csv_url
 
 SAMPLE = "data/sample_matches.csv"
@@ -221,3 +221,16 @@ def test_won_counts_wins_and_half_draws():
     draw = [Match(("A", "B"), ("C", "D"), 3, 3), Match(("A", "C"), ("B", "D"), 5, 2)]
     won = RatingModel().fit(draw).won
     assert won == {"A": 1.5, "B": 0.5, "C": 1.5, "D": 0.5}
+
+
+def test_in_sample_fits_on_all_matches_and_beats_leave_one_out():
+    matches = load_matches(SAMPLE)
+    versions = {"mine": {"Andrea": 9, "Fabio": 2}, "Unadjusted": {}}
+    train = in_sample(matches, versions)
+    full = RatingModel().fit(matches, versions["mine"])
+    assert train["mine"][2].goal_diff == pytest.approx(
+        full.predict(matches[2].team_a, matches[2].team_b).goal_diff
+    )
+    loo = leave_one_out(matches, versions)
+    for v in versions:
+        assert summarize(matches, train[v]).mean_error < summarize(matches, loo[v]).mean_error
