@@ -75,12 +75,13 @@ def cmd_ratings(args: argparse.Namespace) -> None:
     print()
     # Rated players who never played appear only in the manual versions.
     players = {p for m in models.values() for p in m.ratings}
-    games = {p: max(m.games.get(p, 0) for m in models.values()) for p in players}
     unadjusted = models[NO_RATINGS]
-    print(f"{'Player':<20}" + "".join(f"{v:>{_col(v)}}" for v in models) + f"{'Games':>7}")
+    header = "".join(f"{v:>{_col(v)}}" for v in models)
+    print(f"{'Player':<20}{header}{'Games':>7}{'Won':>6}")
     for p in sorted(players, key=lambda p: (-unadjusted.rating(p), p)):
         cells = "".join(f"{m.rating(p):>+{_col(v)}.2f}" for v, m in models.items())
-        print(f"{p:<20}{cells}{games[p]:>7}")
+        games, won = unadjusted.games.get(p, 0), unadjusted.won.get(p, 0.0)
+        print(f"{p:<20}{cells}{games:>7}{won:>6.1f}")
 
 
 def cmd_predict(args: argparse.Namespace) -> None:

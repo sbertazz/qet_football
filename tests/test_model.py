@@ -196,7 +196,7 @@ def test_ratings_command_puts_unadjusted_first_and_sorts_by_it(tmp_path, monkeyp
     main(["ratings"])
     lines = capsys.readouterr().out.splitlines()
     header = next(line for line in lines if line.startswith("Player"))
-    assert header.split() == ["Player", "Unadjusted", "mine", "Games"]
+    assert header.split() == ["Player", "Unadjusted", "mine", "Games", "Won"]
     rows = [line.split() for line in lines[lines.index(header) + 1:]]
     unadjusted = [float(r[1]) for r in rows]
     assert unadjusted == sorted(unadjusted, reverse=True)
@@ -206,3 +206,15 @@ def test_ratings_command_puts_unadjusted_first_and_sorts_by_it(tmp_path, monkeyp
     assert "Using ratings: mine" in capsys.readouterr().out  # default stays the first manual version
     main(["--version", "unadjusted", "predict", "--a", "Marco", "--b", "Luca"])
     assert "Using ratings: Unadjusted" in capsys.readouterr().out
+
+
+def test_won_counts_wins_and_half_draws():
+    model = RatingModel().fit(load_matches(BLOCKS))
+    # 08/09: left 12-10 (Alpha's team wins); 15/09: right 9-7 (Alpha's team wins again)
+    assert model.won["Alpha"] == 2.0
+    assert model.won["Golf"] == 0.0  # lost both
+    assert "Bravo+1" not in model.won
+
+    draw = [Match(("A", "B"), ("C", "D"), 3, 3), Match(("A", "C"), ("B", "D"), 5, 2)]
+    won = RatingModel().fit(draw).won
+    assert won == {"A": 1.5, "B": 0.5, "C": 1.5, "D": 0.5}

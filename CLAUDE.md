@@ -32,7 +32,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 ## Code
 
 - `qet.py`: entry point. `qet_football/cli.py`: commands `ratings` (`Unadjusted` = matches only,
-  shown first and used for sorting, then each version),
+  shown first and used for sorting, then each version, Games, Won (draw = 0.5)),
   `evaluate`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),
@@ -46,9 +46,9 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 ## Status
 
-- Last updated: 2026-09-27.
+- Last updated: 2026-09-28.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate`. 22 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate`. 23 tests passing.
 - Data: 4 matches (Sept 2026), ~15 players; 3 manual rating versions (4-5 players each;
   ratings1 fitted beta ~0.23).
   Too little for meaningful ratings yet.

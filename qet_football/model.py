@@ -53,6 +53,7 @@ class RatingModel:
         self.alpha = alpha
         self.ratings: dict[str, float] = {}
         self.games: dict[str, int] = {}
+        self.won: dict[str, float] = {}  # win = 1, draw = 0.5, loss = 0
         self.scores: dict[str, float] = {}
         self.beta = 0.0
         self.sigma = MIN_SIGMA
@@ -95,6 +96,13 @@ class RatingModel:
         w = theta[:n] + self.beta * centred
         self.ratings = dict(zip(players, w.tolist()))
         self.games = {p: int(np.count_nonzero(X[:, i])) for p, i in index.items()}
+        self.won = dict.fromkeys(players, 0.0)
+        for m in matches:
+            points_a = 1.0 if m.goal_diff > 0 else 0.5 if m.goal_diff == 0 else 0.0
+            for team, points in ((m.team_a, points_a), (m.team_b, 1.0 - points_a)):
+                for p in team:
+                    if p in self.won:
+                        self.won[p] += points
 
         dof = max(len(matches) - 1, 1)
         rms = math.sqrt(float(np.sum((y - X @ w) ** 2)) / dof)
