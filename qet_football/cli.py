@@ -76,12 +76,26 @@ def cmd_ratings(args: argparse.Namespace) -> None:
     # Rated players who never played appear only in the manual versions.
     players = {p for m in models.values() for p in m.ratings}
     unadjusted = models[NO_RATINGS]
-    header = "".join(f"{v:>{_col(v)}}" for v in models)
+    # Manual versions show the user's score after the rating, e.g. "+0.75 [9]";
+    # unrated players get blank padding so the ratings stay aligned.
+    tag_width = 6  # " [7.5]"
+    widths = {v: _col(v) if v == NO_RATINGS else max(len(v), 6 + tag_width) + 2 for v in models}
+
+    def cell(v: str, p: str) -> str:
+        text = f"{models[v].rating(p):+.2f}"
+        if v != NO_RATINGS:
+            score = versions[v].get(p)
+            text += (f" [{score:g}]" if score is not None else "").ljust(tag_width)
+        return f"{text:>{widths[v]}}"
+
+    header = "".join(f"{v:>{widths[v]}}" for v in models)
     print(f"{'Player':<20}{header}{'Games':>7}{'Won':>6}")
     for p in sorted(players, key=lambda p: (-unadjusted.rating(p), p)):
-        cells = "".join(f"{m.rating(p):>+{_col(v)}.2f}" for v, m in models.items())
+        cells = "".join(cell(v, p) for v in models)
         games, won = unadjusted.games.get(p, 0), unadjusted.won.get(p, 0.0)
         print(f"{p:<20}{cells}{games:>7}{won:>6.1f}")
+    if len(models) > 1:
+        print("\n[n] = your manual rating in that version; no brackets = not rated.")
 
 
 def cmd_predict(args: argparse.Namespace) -> None:

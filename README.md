@@ -96,7 +96,8 @@ learned from the matches. Players you don't rate start at the average of the
 ratings you gave. Use another file with `--ratings <path>`.
 
 - `ratings` shows the model's ratings for `Unadjusted` (match results only, sorted by it)
-  and for every version, then games played and games won (a draw counts 0.5).
+  and for every version, then games played and games won (a draw counts 0.5). In the
+  version columns your manual rating is shown in brackets, e.g. `+0.75 [9]`.
 - `evaluate` predicts each past match from all the others, for every version and
   `Unadjusted`, and shows which version predicts best. With few matches the winner may
   just be luck.

@@ -32,7 +32,8 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 ## Code
 
 - `qet.py`: entry point. `qet_football/cli.py`: commands `ratings` (`Unadjusted` = matches only,
-  shown first and used for sorting, then each version, Games, Won (draw = 0.5)),
+  shown first and used for sorting, then each version with the manual score in brackets
+  e.g. `+0.75 [9]`, Games, Won (draw = 0.5)),
   `evaluate`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),

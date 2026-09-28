@@ -197,10 +197,13 @@ def test_ratings_command_puts_unadjusted_first_and_sorts_by_it(tmp_path, monkeyp
     lines = capsys.readouterr().out.splitlines()
     header = next(line for line in lines if line.startswith("Player"))
     assert header.split() == ["Player", "Unadjusted", "mine", "Games", "Won"]
-    rows = [line.split() for line in lines[lines.index(header) + 1:]]
-    unadjusted = [float(r[1]) for r in rows]
+    rows = [line for line in lines[lines.index(header) + 1:] if line and not line.startswith("[")]
+    unadjusted = [float(r.split()[1]) for r in rows]
     assert unadjusted == sorted(unadjusted, reverse=True)
-    assert "Newbie" in [r[0] for r in rows]  # rated but never played
+    by_player = {r.split()[0]: r for r in rows}
+    assert "Newbie" in by_player  # rated but never played
+    assert "[10]" in by_player["Fabio"] and "[9]" in by_player["Newbie"]  # manual scores shown
+    assert "[" not in by_player["Marco"]  # unrated: no brackets
 
     main(["predict", "--a", "Marco", "--b", "Luca"])
     assert "Using ratings: mine" in capsys.readouterr().out  # default stays the first manual version
