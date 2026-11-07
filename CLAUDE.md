@@ -58,7 +58,8 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   than always guessing a draw (3.12 with cap 4 vs 2.11; winners 2/9); without it the model
   beats the draw guess (1.47 vs 1.62). Cap 4 added for this; it helps only a little.
 - Treating 1-2 game players as average (guests) in fitting barely changed leave-one-out
-  (3.12 -> 3.09/3.02); not implemented.
+  (3.12 -> 3.09/3.02); not implemented. User also declined a `--min-games` filter to hide
+  low-game players from the ratings table: keep showing everyone.
 - Tried and removed (2026-09-27): a `search` command hill-climbing 1-10 ratings to minimise
   leave-one-out error. It reached ~0.03 error but overfits (a simulation showed it predicts
   new matches worse than honest ratings, and searches from different starts disagreed
