@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from .data import Match
-from .model import Prediction, RatingModel
+from .model import DEFAULT_CAP, Prediction, RatingModel
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ def leave_one_out(
     matches: Sequence[Match],
     versions: Mapping[str, Mapping[str, float]],
     alpha: float = 3.0,
+    cap: float | None = DEFAULT_CAP,
 ) -> dict[str, list[Prediction]]:
     """{version: [prediction for match i, fitted without match i]}."""
     if len(matches) < 2:
@@ -42,7 +43,7 @@ def leave_one_out(
     for i, m in enumerate(matches):
         rest = [*matches[:i], *matches[i + 1:]]
         for version, scores in versions.items():
-            model = RatingModel(alpha=alpha).fit(rest, scores)
+            model = RatingModel(alpha=alpha, cap=cap).fit(rest, scores)
             results[version].append(model.predict(m.team_a, m.team_b))
     return results
 
@@ -51,11 +52,12 @@ def in_sample(
     matches: Sequence[Match],
     versions: Mapping[str, Mapping[str, float]],
     alpha: float = 3.0,
+    cap: float | None = DEFAULT_CAP,
 ) -> dict[str, list[Prediction]]:
     """{version: [prediction for match i, fitted on all matches including i]}."""
     results = {}
     for version, scores in versions.items():
-        model = RatingModel(alpha=alpha).fit(matches, scores)
+        model = RatingModel(alpha=alpha, cap=cap).fit(matches, scores)
         results[version] = [model.predict(m.team_a, m.team_b) for m in matches]
     return results
 

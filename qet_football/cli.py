@@ -19,7 +19,7 @@ import os
 from .balance import balance_teams
 from .data import Match, load_matches, load_score_versions, normalize_name
 from .evaluate import in_sample, leave_one_out, summarize
-from .model import RatingModel
+from .model import DEFAULT_CAP, RatingModel
 
 DEFAULT_DATA = "data/matches.csv"
 DEFAULT_RATINGS = "data/player_ratings.csv"
@@ -56,7 +56,7 @@ def _load_model(args: argparse.Namespace) -> RatingModel:
             raise SystemExit(f"unknown version {args.version!r}; choose from {', '.join(versions)}")
     else:  # first manual version if there is one
         name = next((v for v in versions if v != NO_RATINGS), NO_RATINGS)
-    model = RatingModel(alpha=args.alpha).fit(matches, versions[name])
+    model = RatingModel(alpha=args.alpha, cap=args.cap).fit(matches, versions[name])
     detail = f" (1 point = {model.beta:.2f} goals)" if versions[name] else ""
     print(f"Using ratings: {name}{detail}\n")
     return model
@@ -68,7 +68,7 @@ def _col(name: str) -> int:
 
 def cmd_ratings(args: argparse.Namespace) -> None:
     matches, versions = _load_matches(args), _load_versions(args)
-    models = {v: RatingModel(alpha=args.alpha).fit(matches, s) for v, s in versions.items()}
+    models = {v: RatingModel(alpha=args.alpha, cap=args.cap).fit(matches, s) for v, s in versions.items()}
     for v, model in models.items():
         if versions[v]:
             print(f"  {v}: {len(versions[v])} players rated, 1 point = {model.beta:.2f} goals")
@@ -130,8 +130,10 @@ def cmd_balance(args: argparse.Namespace) -> None:
 
 def cmd_evaluate(args: argparse.Namespace) -> None:
     matches, versions = _load_matches(args), _load_versions(args)
-    results = leave_one_out(matches, versions, alpha=args.alpha)
-    print("Each match predicted from all the others (goal difference, left - right):\n")
+    results = leave_one_out(matches, versions, alpha=args.alpha, cap=args.cap)
+    cap = f"goal difference capped at +/-{args.cap:g} when fitting" if args.cap else "no cap"
+    print(f"Each match predicted from all the others (goal difference, left - right; {cap};")
+    print("predictions are scored against the real, uncapped results):\n")
     header = f"{'Match':<12}{'Score':>7}{'Actual':>8}" + "".join(f"{v:>{_col(v)}}" for v in results)
     print(header)
     for i, m in enumerate(matches):
@@ -147,7 +149,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
     groups = [
         ("Leave-one-out (each match predicted without seeing it):", results),
         ("Training set (fitted on all matches, scored on the same matches):",
-         in_sample(matches, versions, alpha=args.alpha)),
+         in_sample(matches, versions, alpha=args.alpha, cap=args.cap)),
     ]
     print("-" * len(header))
     for title, preds in groups:
@@ -174,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", help="which ratings column predict/balance use (default: first)")
     parser.add_argument("--alpha", type=float, default=3.0,
                         help="shrinkage towards average; higher = more cautious ratings")
+    parser.add_argument("--cap", type=float, default=DEFAULT_CAP,
+                        help=f"clip each match's goal difference to +/- this when fitting "
+                             f"(default {DEFAULT_CAP}; 0 = no cap)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("ratings", help="show player ratings").set_defaults(func=cmd_ratings)

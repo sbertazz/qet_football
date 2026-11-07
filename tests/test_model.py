@@ -234,3 +234,20 @@ def test_in_sample_fits_on_all_matches_and_beats_leave_one_out():
     loo = leave_one_out(matches, versions)
     for v in versions:
         assert summarize(matches, train[v]).mean_error < summarize(matches, loo[v]).mean_error
+
+
+def test_cap_clips_blowouts_when_fitting():
+    blowout = [Match(("A",), ("B",), 12, 2)]
+    capped = RatingModel(alpha=0.01).fit(blowout)
+    uncapped = RatingModel(alpha=0.01, cap=0).fit(blowout)
+    # One player per side: rating gap ~ fitted goal difference.
+    assert capped.rating("A") - capped.rating("B") == pytest.approx(4, abs=0.05)
+    assert uncapped.rating("A") - uncapped.rating("B") == pytest.approx(10, abs=0.1)
+    assert capped.won == {"A": 1.0, "B": 0.0}  # won count uses the real result
+
+
+def test_evaluate_scores_against_real_results_with_cap():
+    matches = [Match(("A",), ("B",), 12, 2), Match(("A",), ("B",), 12, 2)]
+    pred = leave_one_out(matches, {"x": {}}, alpha=0.01, cap=4)["x"][0]
+    assert pred.goal_diff == pytest.approx(4, abs=0.05)
+    assert summarize(matches, [pred, pred]).mean_error == pytest.approx(6, abs=0.05)

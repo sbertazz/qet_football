@@ -29,6 +29,10 @@ from .data import Match, is_guest, normalize_name
 # too optimistic, and a 6v6 game is noisy.
 MIN_SIGMA = 2.0
 
+# Each match's goal difference is clipped to +/- this many goals when fitting,
+# so a single blowout (often partly luck) can't dominate the ratings.
+DEFAULT_CAP = 4
+
 # Goals per manual score point before seeing any match, and how firmly beta is
 # held there (higher = trust the prior more). Rating 9 vs 3 ~ 1 goal per game.
 BETA_PRIOR = 0.15
@@ -49,8 +53,9 @@ def _norm_cdf(x: float) -> float:
 
 
 class RatingModel:
-    def __init__(self, alpha: float = 3.0):
+    def __init__(self, alpha: float = 3.0, cap: float | None = DEFAULT_CAP):
         self.alpha = alpha
+        self.cap = cap or None  # None or 0 = no cap
         self.ratings: dict[str, float] = {}
         self.games: dict[str, int] = {}
         self.won: dict[str, float] = {}  # win = 1, draw = 0.5, loss = 0
@@ -70,6 +75,8 @@ class RatingModel:
         index = {p: i for i, p in enumerate(players)}
         X = np.zeros((len(matches), len(players)))
         y = np.array([m.goal_diff for m in matches], dtype=float)
+        if self.cap is not None:
+            y = np.clip(y, -self.cap, self.cap)
         for row, m in enumerate(matches):
             # Guests have no column: they count as an average (0) player.
             for p in m.team_a:

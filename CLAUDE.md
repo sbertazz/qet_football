@@ -36,7 +36,8 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   e.g. `+0.75 [9]`, Games, Won (draw = 0.5)),
   `evaluate`, `predict`, `balance`.
 - `qet_football/data.py`: loads table or block CSV layouts, name clean-up, guests.
-- `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3),
+- `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3;
+  goal difference clipped to +/-DEFAULT_CAP=4 when fitting, `--cap 0` = off),
   win/draw/loss from a normal on goal difference (sigma floor 2.0). Manual ratings set each
   player's prior mean = beta * (score - mean score); beta (goals per point) is fitted jointly,
   pulled towards BETA_PRIOR=0.15 with BETA_PENALTY=20.
@@ -47,14 +48,17 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 ## Status
 
-- Last updated: 2026-09-28.
+- Last updated: 2026-11-07.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set). 24 tests passing.
-- Data: 4 matches (Sept 2026), ~15 players; 3 manual rating versions (4-5 players each;
-  ratings1 fitted beta ~0.23).
-  Too little for meaningful ratings yet.
-- Leave-one-out on 4 matches: user's ratings1 0.90 goals avg error, ratings2/3 (Ayman=8) 1.20,
-  Unadjusted 1.29. Training-set errors 0.20-0.31 (big gap = expected overfitting at 4 matches).
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap. 26 tests passing.
+- Data: 9 matches (Sep-Nov 2026), 20 players. Nas, Nasri, Nasaar are different people (user
+  confirmed; sheet later fixed Nasaar->Nas on 6/10, Umer->Umar). Sheet spells Abderrahmane;
+  user sometimes types Abdderahmane. Manual ratings: 3 versions, 4-5 players.
+- 03/11 (16-10) is a big upset, confirmed legit by the user. With it, leave-one-out is worse
+  than always guessing a draw (3.12 with cap 4 vs 2.11; winners 2/9); without it the model
+  beats the draw guess (1.47 vs 1.62). Cap 4 added for this; it helps only a little.
+- Treating 1-2 game players as average (guests) in fitting barely changed leave-one-out
+  (3.12 -> 3.09/3.02); not implemented.
 - Tried and removed (2026-09-27): a `search` command hill-climbing 1-10 ratings to minimise
   leave-one-out error. It reached ~0.03 error but overfits (a simulation showed it predicts
   new matches worse than honest ratings, and searches from different starts disagreed

@@ -114,6 +114,10 @@ python qet.py balance "Marco,Luca,Stefano,Paolo,Andrea,Giorgio,Davide,Matteo,Sim
 python qet.py balance "..." --top 5 --together "Marco,Luca" --apart "Andrea,Paolo"
 ```
 
+`--cap` (default 4) clips each match's goal difference to +/-4 goals when fitting, so one
+blowout can't dominate the ratings (`--cap 0` turns it off; `evaluate` still scores
+predictions against the real results).
+
 `--alpha` (default 3) controls how cautious the ratings are: higher values keep
 everyone closer to average, lower values trust the results more.
 
