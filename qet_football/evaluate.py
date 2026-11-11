@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from .data import Match
-from .model import DEFAULT_CAP, Prediction, RatingModel
+from .model import Prediction, RatingModel
 
 
 @dataclass(frozen=True)
@@ -33,17 +33,19 @@ def most_likely(p: Prediction) -> int:
 def leave_one_out(
     matches: Sequence[Match],
     versions: Mapping[str, Mapping[str, float]],
-    alpha: float = 3.0,
-    cap: float | None = DEFAULT_CAP,
+    **model_options,
 ) -> dict[str, list[Prediction]]:
-    """{version: [prediction for match i, fitted without match i]}."""
+    """{version: [prediction for match i, fitted without match i]}.
+
+    `model_options` (alpha, cap, beta, hold) are passed to RatingModel.
+    """
     if len(matches) < 2:
         raise ValueError("need at least 2 matches to evaluate")
     results: dict[str, list[Prediction]] = {v: [] for v in versions}
     for i, m in enumerate(matches):
         rest = [*matches[:i], *matches[i + 1:]]
         for version, scores in versions.items():
-            model = RatingModel(alpha=alpha, cap=cap).fit(rest, scores)
+            model = RatingModel(**model_options).fit(rest, scores)
             results[version].append(model.predict(m.team_a, m.team_b))
     return results
 
@@ -51,13 +53,12 @@ def leave_one_out(
 def in_sample(
     matches: Sequence[Match],
     versions: Mapping[str, Mapping[str, float]],
-    alpha: float = 3.0,
-    cap: float | None = DEFAULT_CAP,
+    **model_options,
 ) -> dict[str, list[Prediction]]:
     """{version: [prediction for match i, fitted on all matches including i]}."""
     results = {}
     for version, scores in versions.items():
-        model = RatingModel(alpha=alpha, cap=cap).fit(matches, scores)
+        model = RatingModel(**model_options).fit(matches, scores)
         results[version] = [model.predict(m.team_a, m.team_b) for m in matches]
     return results
 

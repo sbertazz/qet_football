@@ -19,7 +19,7 @@ import os
 from .balance import balance_teams
 from .data import Match, load_matches, load_score_versions, normalize_name
 from .evaluate import in_sample, leave_one_out, summarize
-from .model import DEFAULT_CAP, RatingModel
+from .model import DEFAULT_BETA, DEFAULT_CAP, DEFAULT_HOLD, RatingModel
 
 DEFAULT_DATA = "data/matches.csv"
 DEFAULT_RATINGS = "data/player_ratings.csv"
@@ -56,10 +56,28 @@ def _load_model(args: argparse.Namespace) -> RatingModel:
             raise SystemExit(f"unknown version {args.version!r}; choose from {', '.join(versions)}")
     else:  # first manual version if there is one
         name = next((v for v in versions if v != NO_RATINGS), NO_RATINGS)
-    model = RatingModel(alpha=args.alpha, cap=args.cap).fit(matches, versions[name])
-    detail = f" (1 point = {model.beta:.2f} goals)" if versions[name] else ""
+    model = RatingModel(**_model_options(args)).fit(matches, versions[name])
+    detail = f" ({_beta_text(model)})" if versions[name] else ""
     print(f"Using ratings: {name}{detail}\n")
     return model
+
+
+def _model_options(args: argparse.Namespace) -> dict:
+    return {"alpha": args.alpha, "cap": args.cap, "beta": args.beta, "hold": args.hold}
+
+
+def _beta_text(model: RatingModel) -> str:
+    kind = "learned" if model.fixed_beta is None else "fixed"
+    return f"1 point = {model.beta:.2f} goals ({kind})"
+
+
+def _beta_arg(text: str) -> float | None:
+    if text.strip().lower() == "learned":
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("expected a number or 'learned'") from None
 
 
 def _col(name: str) -> int:
@@ -68,10 +86,10 @@ def _col(name: str) -> int:
 
 def cmd_ratings(args: argparse.Namespace) -> None:
     matches, versions = _load_matches(args), _load_versions(args)
-    models = {v: RatingModel(alpha=args.alpha, cap=args.cap).fit(matches, s) for v, s in versions.items()}
+    models = {v: RatingModel(**_model_options(args)).fit(matches, s) for v, s in versions.items()}
     for v, model in models.items():
         if versions[v]:
-            print(f"  {v}: {len(versions[v])} players rated, 1 point = {model.beta:.2f} goals")
+            print(f"  {v}: {len(versions[v])} players rated, {_beta_text(model)}")
     print()
     # Rated players who never played appear only in the manual versions.
     players = {p for m in models.values() for p in m.ratings}
@@ -130,7 +148,7 @@ def cmd_balance(args: argparse.Namespace) -> None:
 
 def cmd_evaluate(args: argparse.Namespace) -> None:
     matches, versions = _load_matches(args), _load_versions(args)
-    results = leave_one_out(matches, versions, alpha=args.alpha, cap=args.cap)
+    results = leave_one_out(matches, versions, **_model_options(args))
     cap = f"goal difference capped at +/-{args.cap:g} when fitting" if args.cap else "no cap"
     print(f"Each match predicted from all the others (goal difference, left - right; {cap};")
     print("predictions are scored against the real, uncapped results):\n")
@@ -149,7 +167,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
     groups = [
         ("Leave-one-out (each match predicted without seeing it):", results),
         ("Training set (fitted on all matches, scored on the same matches):",
-         in_sample(matches, versions, alpha=args.alpha, cap=args.cap)),
+         in_sample(matches, versions, **_model_options(args))),
     ]
     print("-" * len(header))
     for title, preds in groups:
@@ -179,6 +197,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cap", type=float, default=DEFAULT_CAP,
                         help=f"clip each match's goal difference to +/- this when fitting "
                              f"(default {DEFAULT_CAP}; 0 = no cap)")
+    parser.add_argument("--beta", type=_beta_arg, default=DEFAULT_BETA,
+                        help=f"goals per manual rating point (default {DEFAULT_BETA}); "
+                             "'learned' = estimate it from the matches")
+    parser.add_argument("--hold", type=float, default=DEFAULT_HOLD,
+                        help="how many times more firmly rated players are held at their "
+                             f"manual rating than unrated players (default {DEFAULT_HOLD:g})")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("ratings", help="show player ratings").set_defaults(func=cmd_ratings)

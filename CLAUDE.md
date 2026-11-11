@@ -39,8 +39,9 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3;
   goal difference clipped to +/-DEFAULT_CAP=4 when fitting, `--cap 0` = off),
   win/draw/loss from a normal on goal difference (sigma floor 2.0). Manual ratings set each
-  player's prior mean = beta * (score - mean score); beta (goals per point) is fitted jointly,
-  pulled towards BETA_PRIOR=0.15 with BETA_PENALTY=20.
+  player's prior mean = beta * (score - mean score); beta (goals per point) fixed at
+  DEFAULT_BETA=0.2 (`--beta learned` fits it, pulled to BETA_PRIOR=0.15 / BETA_PENALTY=20);
+  rated players' deviation penalty is alpha * DEFAULT_HOLD=20 (`--hold`).
 - `qet_football/evaluate.py`: leave-one-out comparison of rating versions (avg goal error,
   outcome right, avg probability of the actual outcome), plus the same on the training set.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
@@ -48,15 +49,21 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 ## Status
 
-- Last updated: 2026-11-07.
+- Last updated: 2026-11-11.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap. 26 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold. 28 tests passing.
 - Data: 9 matches (Sep-Nov 2026), 20 players. Nas, Nasri, Nasaar are different people (user
   confirmed; sheet later fixed Nasaar->Nas on 6/10, Umer->Umar). Sheet spells Abderrahmane;
   user sometimes types Abdderahmane. Manual ratings: 3 versions, 4-5 players.
 - 03/11 (16-10) is a big upset, confirmed legit by the user. With it, leave-one-out is worse
   than always guessing a draw (3.12 with cap 4 vs 2.11; winners 2/9); without it the model
   beats the draw guess (1.47 vs 1.62). Cap 4 added for this; it helps only a little.
+- 10/11 (14-10, user will add to sheet): near-rematch of 03/11, same side won again. With it,
+  leave-one-out 2.70 vs draw guess 2.30 (Unadjusted). Learned beta collapsed to ~0.05 with
+  sparse manual ratings, yet trusting them helped out of sample: Hamza 10 / Madhu 1 at
+  beta 0.2, hold 20 gave 2.41 (vs 2.86 learned). User chose 0.2 / 20 as defaults.
+- Known quirk: unrated players sit at the mean of the given scores, so rating only strong
+  players makes an 8 count as below average. Proposed fixing the midpoint at 5.5; not decided.
 - Treating 1-2 game players as average (guests) in fitting barely changed leave-one-out
   (3.12 -> 3.09/3.02); not implemented. User also declined a `--min-games` filter to hide
   low-game players from the ratings table: keep showing everyone.

@@ -91,9 +91,11 @@ An empty cell means "not rated in that version". A single `rating` column works 
 
 Ratings set each player's starting point: above or below average according to
 your rating. Match results then adjust from there, and as more games are
-recorded they take over. How many goals one rating point is worth is also
-learned from the matches. Players you don't rate start at the average of the
-ratings you gave. Use another file with `--ratings <path>`.
+recorded they take over. One rating point is worth 0.2 goals (`--beta`, or
+`--beta learned` to estimate it from the matches), and rated players are held
+at your rating 20 times more firmly than unrated ones (`--hold`). Players you
+don't rate start at the average of the ratings you gave. Use another file with
+`--ratings <path>`.
 
 - `ratings` shows the model's ratings for `Unadjusted` (match results only, sorted by it)
   and for every version, then games played and games won (a draw counts 0.5). In the

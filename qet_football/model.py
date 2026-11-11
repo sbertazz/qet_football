@@ -10,9 +10,11 @@ with few matches, players are pulled towards their prior. Guests are rated 0.
 
 Manual scores (1-10, optional) set that prior: a player's starting point is
     beta * (score - mean score)
-where beta, the goals one score point is worth, is fitted from the matches
-too (itself pulled towards BETA_PRIOR). Players without a score start at 0,
-i.e. average. The residual spread gives win/draw/loss probabilities.
+where beta is the goals one score point is worth: fixed (DEFAULT_BETA) or, with
+beta=None, fitted from the matches too (pulled towards BETA_PRIOR). Rated
+players are held at their starting point `hold` times more firmly than
+unrated ones, who start at 0, i.e. average. The residual spread gives
+win/draw/loss probabilities.
 """
 
 from __future__ import annotations
@@ -33,8 +35,15 @@ MIN_SIGMA = 2.0
 # so a single blowout (often partly luck) can't dominate the ratings.
 DEFAULT_CAP = 4
 
-# Goals per manual score point before seeing any match, and how firmly beta is
-# held there (higher = trust the prior more). Rating 9 vs 3 ~ 1 goal per game.
+# Goals per manual score point (10 vs 1 ~ 1.8 goals per game), and how many
+# times more firmly rated players are held at their starting point than
+# unrated ones. With few matches, learning beta from the data made the manual
+# ratings collapse to ~0 although trusting them predicted unseen matches better.
+DEFAULT_BETA = 0.2
+DEFAULT_HOLD = 20.0
+
+# Only when beta is learned (beta=None): its starting value and how firmly it
+# is held there.
 BETA_PRIOR = 0.15
 BETA_PENALTY = 20.0
 
@@ -53,9 +62,17 @@ def _norm_cdf(x: float) -> float:
 
 
 class RatingModel:
-    def __init__(self, alpha: float = 3.0, cap: float | None = DEFAULT_CAP):
+    def __init__(
+        self,
+        alpha: float = 3.0,
+        cap: float | None = DEFAULT_CAP,
+        beta: float | None = DEFAULT_BETA,
+        hold: float = DEFAULT_HOLD,
+    ):
         self.alpha = alpha
         self.cap = cap or None  # None or 0 = no cap
+        self.fixed_beta = beta  # None = learn beta from the matches
+        self.hold = hold
         self.ratings: dict[str, float] = {}
         self.games: dict[str, int] = {}
         self.won: dict[str, float] = {}  # win = 1, draw = 0.5, loss = 0
@@ -86,21 +103,30 @@ class RatingModel:
                 if p in index:
                     X[row, index[p]] -= 1
 
-        # rating = beta * centred score + delta. Solve for [delta..., beta] jointly,
-        # with delta pulled to 0 (strength alpha) and beta to BETA_PRIOR.
+        # rating = beta * centred score + delta, with delta pulled to 0: strength
+        # alpha, times `hold` for rated players.
         mean_score = float(np.mean(list(self.scores.values()))) if self.scores else 0.0
         centred = np.array([self.scores.get(p, mean_score) - mean_score for p in players])
         n = len(players)
-        A = np.column_stack([X, X @ centred])
-        penalty = np.diag([self.alpha] * n + [BETA_PENALTY])
-        prior = np.zeros(n + 1)
-        if self.scores:
-            prior[n] = BETA_PRIOR
+        delta_penalty = np.array(
+            [self.alpha * (self.hold if p in self.scores else 1.0) for p in players]
+        )
+        if not self.scores:
+            self.beta = 0.0
+        elif self.fixed_beta is not None:
+            self.beta = float(self.fixed_beta)
+        if not self.scores or self.fixed_beta is not None:
+            target = y - X @ (self.beta * centred)
+            delta = np.linalg.solve(X.T @ X + np.diag(delta_penalty), X.T @ target)
         else:
-            penalty[n, n] = 1.0  # beta has nothing to act on; keep the system solvable
-        theta = np.linalg.solve(A.T @ A + penalty, A.T @ y + penalty @ prior)
-        self.beta = float(theta[n]) if self.scores else 0.0
-        w = theta[:n] + self.beta * centred
+            # Learned beta: solve for [delta..., beta] jointly, beta pulled to BETA_PRIOR.
+            A = np.column_stack([X, X @ centred])
+            penalty = np.diag([*delta_penalty, BETA_PENALTY])
+            prior = np.zeros(n + 1)
+            prior[n] = BETA_PRIOR
+            theta = np.linalg.solve(A.T @ A + penalty, A.T @ y + penalty @ prior)
+            delta, self.beta = theta[:n], float(theta[n])
+        w = delta + self.beta * centred
         self.ratings = dict(zip(players, w.tolist()))
         self.games = {p: int(np.count_nonzero(X[:, i])) for p, i in index.items()}
         self.won = dict.fromkeys(players, 0.0)

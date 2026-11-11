@@ -173,7 +173,7 @@ def test_scores_that_agree_with_results_increase_beta():
         g = good[k % 6:] + good[: k % 6]
         matches.append(Match((*g[:4], *bad[:2]), (*g[4:], *bad[2:]), 6, 3))
     scores = {**{p: 8 for p in good}, **{p: 3 for p in bad}}
-    model = RatingModel().fit(matches, scores)
+    model = RatingModel(beta=None).fit(matches, scores)  # learned beta
     assert model.beta > 0.15
 
 
@@ -251,3 +251,36 @@ def test_evaluate_scores_against_real_results_with_cap():
     pred = leave_one_out(matches, {"x": {}}, alpha=0.01, cap=4)["x"][0]
     assert pred.goal_diff == pytest.approx(4, abs=0.05)
     assert summarize(matches, [pred, pred]).mean_error == pytest.approx(6, abs=0.05)
+
+
+def test_fixed_beta_and_hold():
+    matches = load_matches(SAMPLE)
+    scores = {"Andrea": 9, "Fabio": 1}
+    fixed = RatingModel(beta=0.2, hold=1).fit(matches, scores)
+    assert fixed.beta == 0.2
+    assert fixed.fixed_beta == 0.2
+    # Holding rated players more firmly keeps them closer to beta * (score - mean).
+    loose = RatingModel(beta=0.2, hold=1).fit(matches, scores)
+    firm = RatingModel(beta=0.2, hold=100).fit(matches, scores)
+    start = 0.2 * (9 - 5)
+    assert abs(firm.rating("Andrea") - start) < abs(loose.rating("Andrea") - start)
+    assert abs(firm.rating("Andrea") - start) < 0.1
+    # Unrated players are unaffected by hold: only their own penalty applies.
+    assert RatingModel(beta=0.2, hold=1).fit(matches).ratings == pytest.approx(
+        RatingModel(beta=0.2, hold=100).fit(matches).ratings
+    )
+
+
+def test_beta_learned_option(tmp_path, monkeypatch, capsys):
+    import shutil
+
+    from qet_football.cli import main
+
+    (tmp_path / "data").mkdir()
+    shutil.copy(SAMPLE, tmp_path / "data" / "matches.csv")
+    (tmp_path / "data" / "player_ratings.csv").write_text("player,mine\nAndrea,9\nFabio,1\n")
+    monkeypatch.chdir(tmp_path)
+    main(["ratings"])
+    assert "1 point = 0.20 goals (fixed)" in capsys.readouterr().out
+    main(["--beta", "learned", "ratings"])
+    assert "goals (learned)" in capsys.readouterr().out
