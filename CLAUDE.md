@@ -45,13 +45,17 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - `qet_football/evaluate.py`: leave-one-out comparison of rating versions (avg goal error,
   outcome right, avg probability of the actual outcome), plus the same on the training set.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
-- Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names).
+- `app.py`: Streamlit web app (`streamlit run app.py`), local only (user's choice: PC, not
+  phone/hosted). Display only: reuses the package, no model logic of its own. Tabs Ratings,
+  Balance (incl. "most even across all versions"), Predict, Evaluate, Matches.
+- Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names; `tests/test_app.py` uses
+  Streamlit's AppTest).
 
 ## Status
 
-- Last updated: 2026-11-11.
+- Last updated: 2026-11-14.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold. 28 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app. 30 tests passing.
 - Data: 9 matches (Sep-Nov 2026), 20 players. Nas, Nasri, Nasaar are different people (user
   confirmed; sheet later fixed Nasaar->Nas on 6/10, Umer->Umar). Sheet spells Abderrahmane;
   user sometimes types Abdderahmane. Manual ratings: 3 versions, 4-5 players.
@@ -62,6 +66,9 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   leave-one-out 2.70 vs draw guess 2.30 (Unadjusted). Learned beta collapsed to ~0.05 with
   sparse manual ratings, yet trusting them helped out of sample: Hamza 10 / Madhu 1 at
   beta 0.2, hold 20 gave 2.41 (vs 2.86 learned). User chose 0.2 / 20 as defaults.
+- Manual ratings tried on 10 matches (beta 0.2, hold 20): Hamza 10 / Madhu 1 best (LOO 2.41);
+  adding Ayman 9 / Akram 2 -> 2.85; Ayman 10 / Madhu 1 -> 2.89 (Ayman's results don't
+  support a high rating). Saved data/player_ratings.csv still has older ratings1-3.
 - Known quirk: unrated players sit at the mean of the given scores, so rating only strong
   players makes an 8 count as below average. Proposed fixing the midpoint at 5.5; not decided.
 - Treating 1-2 game players as average (guests) in fitting barely changed leave-one-out

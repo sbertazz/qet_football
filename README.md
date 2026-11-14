@@ -40,6 +40,19 @@ python qet.py ratings
 
 The project itself is not installed: run it from the repo folder with `python qet.py`.
 
+## Web app
+
+```bat
+streamlit run app.py
+```
+
+Opens in your browser at http://localhost:8501 and runs only on your machine. Tabs:
+**Ratings** (sortable; cells you rated are highlighted), **Balance** (pick players,
+together/apart, balance on one version or on all at once), **Predict**, **Evaluate**
+(leave-one-out and training set) and **Matches** (what was loaded, with a warning for
+similar names). The sidebar sets the data files, the ratings version and the model
+settings (alpha, cap, beta, hold).
+
 ## Match data
 
 Two layouts are accepted, detected automatically.
