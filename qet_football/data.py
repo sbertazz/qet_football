@@ -93,7 +93,8 @@ def load_score_versions(source: str) -> dict[str, dict[str, float]]:
 
     CSV with a 'player' (or 'name') column; every other column is a version of
     the ratings (e.g. rating / ratings1, ratings2, ...). Empty cell = not rated
-    in that version; lines starting with '#' are comments. Returns {version: {player: score}} in column order.
+    in that version; a column with no ratings is skipped; lines starting with '#'
+    are comments. Returns {version: {player: score}} in column order.
     """
     df = pd.read_csv(sheets_csv_url(source), dtype=str, keep_default_na=False,
                      encoding="utf-8-sig", comment="#")
@@ -113,7 +114,8 @@ def load_score_versions(source: str) -> dict[str, dict[str, float]]:
             if not 1 <= score <= 10:
                 raise ValueError(f"{col}: rating for {name} must be 1-10, got {value}")
             scores[name] = score
-        versions[col] = scores
+        if scores:  # a version with no ratings at all is ignored
+            versions[col] = scores
     return versions
 
 

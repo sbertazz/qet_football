@@ -3,7 +3,8 @@
     streamlit run app.py
 
 A thin UI over the qet_football package: ratings, team balancing, match
-predictions, leave-one-out evaluation and a check of the loaded matches.
+predictions, leave-one-out evaluation, editing manual ratings (up to 3
+versions) and a check of the loaded matches.
 Runs locally; data is read from the same files as the command line tool.
 """
 
@@ -58,8 +59,8 @@ data_source = st.sidebar.text_input(
     os.environ.get("QET_DATA") or DEFAULT_DATA,
 )
 ratings_source = st.sidebar.text_input(
-    "Manual ratings CSV (leave empty for none)",
-    os.environ.get("QET_RATINGS") or (DEFAULT_RATINGS if os.path.exists(DEFAULT_RATINGS) else ""),
+    "Manual ratings file (loaded at start; 'Save' writes here)",
+    os.environ.get("QET_RATINGS") or DEFAULT_RATINGS,
 )
 
 try:
@@ -68,10 +69,116 @@ except Exception as e:  # shown to the user, not raised
     st.error(f"Could not load matches from `{data_source}`: {e}")
     st.stop()
 try:
-    user_versions = _load_versions(ratings_source, _stamp(ratings_source)) if ratings_source else {}
+    file_versions = (
+        _load_versions(ratings_source, _stamp(ratings_source))
+        if ratings_source and os.path.exists(ratings_source) else {}
+    )
 except Exception as e:
     st.error(f"Could not load manual ratings from `{ratings_source}`: {e}")
     st.stop()
+
+match_players = sorted(
+    {p for m in matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
+)
+
+tab_ratings, tab_balance, tab_predict, tab_eval, tab_manual, tab_matches = st.tabs(
+    ["Ratings", "Balance", "Predict", "Evaluate", "Manual ratings", "Matches"]
+)
+
+# --- manual ratings ------------------------------------------------------------
+# Rendered first (its tab is further right) so edits apply to every other tab
+# on the same run.
+
+MAX_VERSIONS = 3
+SLOTS = [f"v{i + 1}" for i in range(MAX_VERSIONS)]
+
+
+def _save_ratings(path: str, versions: dict[str, dict[str, float]]) -> None:
+    players = sorted({p for scores in versions.values() for p in scores})
+    lines = [",".join(["player", *versions])]
+    for p in players:
+        lines.append(",".join([p, *(f"{versions[v][p]:g}" if p in versions[v] else ""
+                                    for v in versions)]))
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _ratings_editor() -> dict[str, dict[str, float]]:
+    """Editable table of up to MAX_VERSIONS rating versions; returns the non-empty ones."""
+    file_names = list(file_versions)
+    if len(file_names) > MAX_VERSIONS:
+        st.warning(
+            f"`{ratings_source}` has {len(file_names)} rating versions; only the first "
+            f"{MAX_VERSIONS} are shown here, and saving would drop: "
+            + ", ".join(file_names[MAX_VERSIONS:])
+        )
+    defaults = [
+        file_names[i] if i < len(file_names)
+        else next(n for n in (f"ratings{i + 1}", f"version{i + 1}") if n not in file_names)
+        for i in range(MAX_VERSIONS)
+    ]
+
+    st.markdown(
+        "Rate players from **1 to 10**; **5.5 = average**, and an empty cell (shown as "
+        "*None*) means not rated (counted as average). To clear a cell, select it and press "
+        "Delete. Edits apply to every tab straight away; **Save** keeps "
+        "them for next time. A version with no ratings is ignored. Add a player who isn't "
+        "in the matches with the + row at the bottom."
+    )
+    name_cols = st.columns(MAX_VERSIONS)
+    names = [name_cols[i].text_input(f"Version {i + 1} name", defaults[i], key=f"vname{i}").strip()
+             for i in range(MAX_VERSIONS)]
+
+    players = sorted(set(match_players) | {p for sc in file_versions.values() for p in sc})
+    base = pd.DataFrame({
+        "Player": players,
+        **{slot: pd.Series([file_versions[file_names[i]].get(p) if i < len(file_names) else None
+                            for p in players], dtype="float")
+           for i, slot in enumerate(SLOTS)},
+    })
+    edited = st.data_editor(
+        base,
+        key="ratings_editor",
+        num_rows="dynamic",
+        hide_index=True,
+        width="stretch",
+        height=min(35 * (len(base) + 2) + 3, 900),
+        column_config={
+            "Player": st.column_config.TextColumn("Player", required=True),
+            **{slot: st.column_config.NumberColumn(names[i] or f"Version {i + 1}",
+                                                   min_value=1, max_value=10, step=1)
+               for i, slot in enumerate(SLOTS)},
+        },
+    )
+
+    versions: dict[str, dict[str, float]] = {}
+    for i, slot in enumerate(SLOTS):
+        scores = {
+            normalize_name(str(row["Player"])): float(row[slot])
+            for _, row in edited.iterrows()
+            if pd.notna(row["Player"]) and str(row["Player"]).strip() and pd.notna(row[slot])
+        }
+        if not scores:
+            continue
+        name = names[i] or f"Version {i + 1}"
+        if name == NO_RATINGS or name in versions:
+            st.warning(f"Version name '{name}' is already used; version {i + 1} is ignored.")
+            continue
+        versions[name] = scores
+
+    summary = ", ".join(f"{v} ({len(sc)} players)" for v, sc in versions.items())
+    st.caption(f"In use: {summary}" if summary else "No manual ratings in use.")
+    if st.button("Save to file", disabled=not ratings_source):
+        _save_ratings(ratings_source, versions)
+        st.success(f"Saved to `{ratings_source}`.")
+    return versions
+
+
+with tab_manual:
+    user_versions = _ratings_editor()
+
+# --- model -----------------------------------------------------------------------
 
 versions = {NO_RATINGS: {}, **user_versions}
 default_version = 1 if user_versions else 0
@@ -125,10 +232,6 @@ def _player_picker(label: str, key: str) -> list[str]:
         st.caption(f"No history (counted as average): {', '.join(unknown)}")
     return players
 
-
-tab_ratings, tab_balance, tab_predict, tab_eval, tab_matches = st.tabs(
-    ["Ratings", "Balance", "Predict", "Evaluate", "Matches"]
-)
 
 # --- ratings -------------------------------------------------------------------
 

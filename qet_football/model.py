@@ -9,11 +9,11 @@ Ratings are fitted with ridge regression, i.e. a Gaussian prior on each rating:
 with few matches, players are pulled towards their prior. Guests are rated 0.
 
 Manual scores (1-10, optional) set that prior: a player's starting point is
-    beta * (score - mean score)
+    beta * (score - RATING_MIDPOINT)
 where beta is the goals one score point is worth: fixed (DEFAULT_BETA) or, with
 beta=None, fitted from the matches too (pulled towards BETA_PRIOR). Rated
 players are held at their starting point `hold` times more firmly than
-unrated ones, who start at 0, i.e. average. The residual spread gives
+unrated ones, who start at 0, i.e. average (a 5.5 on the 1-10 scale). The residual spread gives
 win/draw/loss probabilities.
 """
 
@@ -34,6 +34,11 @@ MIN_SIGMA = 2.0
 # Each match's goal difference is clipped to +/- this many goals when fitting,
 # so a single blowout (often partly luck) can't dominate the ratings.
 DEFAULT_CAP = 4
+
+# Middle of the 1-10 manual scale: an unrated player counts as a 5.5, whoever
+# else is rated. (Centring on the mean of the given scores made an 8 count as
+# below average when only strong players were rated.)
+RATING_MIDPOINT = 5.5
 
 # Goals per manual score point (10 vs 1 ~ 1.8 goals per game), and how many
 # times more firmly rated players are held at their starting point than
@@ -105,8 +110,9 @@ class RatingModel:
 
         # rating = beta * centred score + delta, with delta pulled to 0: strength
         # alpha, times `hold` for rated players.
-        mean_score = float(np.mean(list(self.scores.values()))) if self.scores else 0.0
-        centred = np.array([self.scores.get(p, mean_score) - mean_score for p in players])
+        centred = np.array(
+            [self.scores[p] - RATING_MIDPOINT if p in self.scores else 0.0 for p in players]
+        )
         n = len(players)
         delta_penalty = np.array(
             [self.alpha * (self.hold if p in self.scores else 1.0) for p in players]

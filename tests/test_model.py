@@ -120,6 +120,12 @@ def test_load_several_versions(tmp_path):
     assert versions["ratings2"] == {"Alpha": 8.0, "Bravo": 4.0}
 
 
+def test_empty_version_is_ignored(tmp_path):
+    f = tmp_path / "r.csv"
+    f.write_text("player,v1,v2,v3\nAlpha,7,,\nBravo,3,,\n", encoding="utf-8")
+    assert list(load_score_versions(str(f))) == ["v1"]
+
+
 def test_load_scores_rejects_out_of_range(tmp_path):
     f = tmp_path / "r.csv"
     f.write_text("player,rating\nAlpha,11\n", encoding="utf-8")
@@ -158,10 +164,19 @@ def test_no_scores_matches_plain_model():
 
 
 def test_scores_set_the_starting_point():
-    # With no matches, ratings are exactly beta * (score - mean score).
-    model = RatingModel().fit([], {"High": 9, "Low": 3, "Mid": 6})
-    assert model.rating("High") > model.rating("Mid") > model.rating("Low")
+    # With no matches, ratings are exactly beta * (score - 5.5).
+    model = RatingModel(beta=0.2).fit([], {"High": 9, "Low": 3, "Mid": 5.5})
+    assert model.rating("High") == pytest.approx(0.2 * 3.5)
+    assert model.rating("Low") == pytest.approx(0.2 * -2.5)
     assert model.rating("Mid") == pytest.approx(0.0)
+    assert model.rating("Nobody") == 0.0
+
+
+def test_midpoint_is_fixed_whoever_is_rated():
+    # Rating only strong players: an 8 is still above average.
+    model = RatingModel(beta=0.2).fit([], {"Abder": 8, "Hamza": 10})
+    assert model.rating("Abder") == pytest.approx(0.2 * 2.5)
+    assert model.rating("Abder") > 0
     assert model.rating("Nobody") == 0.0
 
 
@@ -259,10 +274,10 @@ def test_fixed_beta_and_hold():
     fixed = RatingModel(beta=0.2, hold=1).fit(matches, scores)
     assert fixed.beta == 0.2
     assert fixed.fixed_beta == 0.2
-    # Holding rated players more firmly keeps them closer to beta * (score - mean).
+    # Holding rated players more firmly keeps them closer to beta * (score - 5.5).
     loose = RatingModel(beta=0.2, hold=1).fit(matches, scores)
     firm = RatingModel(beta=0.2, hold=100).fit(matches, scores)
-    start = 0.2 * (9 - 5)
+    start = 0.2 * (9 - 5.5)
     assert abs(firm.rating("Andrea") - start) < abs(loose.rating("Andrea") - start)
     assert abs(firm.rating("Andrea") - start) < 0.1
     # Unrated players are unaffected by hold: only their own penalty applies.

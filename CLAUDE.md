@@ -25,7 +25,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - On the user's machine: `data\matches.csv` (CSV export) or the sheet link via `--data` / `QET_DATA`.
 - Manual 1-10 ratings from the user: `data/player_ratings.csv`, git-ignored (opinions about
   friends; the repo is public). Columns: `player` + one column per version (e.g. ratings1,
-  ratings2); empty cell = unrated. Loaded by default if present, or `--ratings`;
+  ratings2); empty cell = unrated; a column with no ratings is skipped. Loaded by default if present, or `--ratings`;
   predict/balance use `--version` (default: first manual version, else Unadjusted).
 - Cloud sessions cannot reach docs.google.com (network policy): ask the user to upload the CSV.
 
@@ -39,7 +39,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - `qet_football/model.py`: ridge regression player ratings on goal difference (alpha=3;
   goal difference clipped to +/-DEFAULT_CAP=4 when fitting, `--cap 0` = off),
   win/draw/loss from a normal on goal difference (sigma floor 2.0). Manual ratings set each
-  player's prior mean = beta * (score - mean score); beta (goals per point) fixed at
+  player's prior mean = beta * (score - RATING_MIDPOINT=5.5); beta (goals per point) fixed at
   DEFAULT_BETA=0.2 (`--beta learned` fits it, pulled to BETA_PRIOR=0.15 / BETA_PENALTY=20);
   rated players' deviation penalty is alpha * DEFAULT_HOLD=20 (`--hold`).
 - `qet_football/evaluate.py`: leave-one-out comparison of rating versions (avg goal error,
@@ -47,15 +47,17 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - `qet_football/balance.py`: exhaustive 6v6 split search (462 splits), together/apart constraints.
 - `app.py`: Streamlit web app (`streamlit run app.py`), local only (user's choice: PC, not
   phone/hosted). Display only: reuses the package, no model logic of its own. Tabs Ratings,
-  Balance (incl. "most even across all versions"), Predict, Evaluate, Matches.
+  Balance (incl. "most even across all versions"), Predict, Evaluate, Manual ratings (editable
+  table, up to 3 versions, edits apply immediately, Save overwrites the ratings file; extra
+  file columns beyond 3 would be dropped, with a warning), Matches.
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names; `tests/test_app.py` uses
   Streamlit's AppTest).
 
 ## Status
 
-- Last updated: 2026-11-14.
+- Last updated: 2026-11-14 (later).
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app. 30 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5. 34 tests passing.
 - Data: 9 matches (Sep-Nov 2026), 20 players. Nas, Nasri, Nasaar are different people (user
   confirmed; sheet later fixed Nasaar->Nas on 6/10, Umer->Umar). Sheet spells Abderrahmane;
   user sometimes types Abdderahmane. Manual ratings: 3 versions, 4-5 players.
@@ -69,8 +71,9 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 - Manual ratings tried on 10 matches (beta 0.2, hold 20): Hamza 10 / Madhu 1 best (LOO 2.41);
   adding Ayman 9 / Akram 2 -> 2.85; Ayman 10 / Madhu 1 -> 2.89 (Ayman's results don't
   support a high rating). Saved data/player_ratings.csv still has older ratings1-3.
-- Known quirk: unrated players sit at the mean of the given scores, so rating only strong
-  players makes an 8 count as below average. Proposed fixing the midpoint at 5.5; not decided.
+- Rating midpoint fixed at 5.5 (was the mean of the given scores, which made an 8 count as below
+  average when only strong players were rated). Leave-one-out numbers above were computed
+  before this change.
 - Treating 1-2 game players as average (guests) in fitting barely changed leave-one-out
   (3.12 -> 3.09/3.02); not implemented. User also declined a `--min-games` filter to hide
   low-game players from the ratings table: keep showing everyone.

@@ -49,7 +49,8 @@ streamlit run app.py
 Opens in your browser at http://localhost:8501 and runs only on your machine. Tabs:
 **Ratings** (sortable; cells you rated are highlighted), **Balance** (pick players,
 together/apart, balance on one version or on all at once), **Predict**, **Evaluate**
-(leave-one-out and training set) and **Matches** (what was loaded, with a warning for
+(leave-one-out and training set), **Manual ratings** (edit up to 3 versions in a
+table; edits apply at once, **Save** writes `data/player_ratings.csv`) and **Matches** (what was loaded, with a warning for
 similar names). The sidebar sets the data files, the ratings version and the model
 settings (alpha, cap, beta, hold).
 
@@ -107,7 +108,7 @@ your rating. Match results then adjust from there, and as more games are
 recorded they take over. One rating point is worth 0.2 goals (`--beta`, or
 `--beta learned` to estimate it from the matches), and rated players are held
 at your rating 20 times more firmly than unrated ones (`--hold`). Players you
-don't rate start at the average of the ratings you gave. Use another file with
+don't rate start as average, i.e. a 5.5 on your 1-10 scale. Use another file with
 `--ratings <path>`.
 
 - `ratings` shows the model's ratings for `Unadjusted` (match results only, sorted by it)
