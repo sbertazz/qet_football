@@ -6,12 +6,22 @@ A thin UI over the qet_football package: ratings, team balancing, match
 predictions, leave-one-out evaluation, editing manual ratings (up to 3
 versions) and a check of the loaded matches.
 Runs locally; data is read from the same files as the command line tool.
+
+Settings, from environment variables or Streamlit secrets (.streamlit/secrets.toml
+locally, the app's Secrets on Streamlit Community Cloud):
+    QET_DATA      match data: CSV path or Google Sheet link
+    QET_RATINGS   manual ratings file
+    QET_PASSWORD  if set, the app asks for this password first
+    QET_VIEWER    "true" for the shared version: no file paths, no saving;
+                  manual ratings and match ticks work for the session only
 """
 
 from __future__ import annotations
 
 import difflib
+import hmac
 import os
+import time
 from collections import Counter
 
 import altair as alt
@@ -27,11 +37,43 @@ from qet_football.model import DEFAULT_BETA, DEFAULT_CAP, DEFAULT_HOLD, RatingMo
 st.set_page_config(page_title="QET Football", page_icon="⚽", layout="wide")
 
 
+def _setting(name: str, default: str = "") -> str:
+    """Environment variable, else Streamlit secret, else default."""
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        return str(st.secrets.get(name, default))
+    except Exception:  # no secrets file at all
+        return default
+
+
+VIEWER = _setting("QET_VIEWER").strip().lower() in ("1", "true", "yes")
+PASSWORD = _setting("QET_PASSWORD")
+
+if PASSWORD and not st.session_state.get("authenticated"):
+    st.title("⚽ QET Football")
+    entered = st.text_input("Password", type="password", key="password")
+    if entered and hmac.compare_digest(entered, PASSWORD):
+        st.session_state["authenticated"] = True
+        st.rerun()
+    if entered:
+        st.error("Wrong password.")
+    st.stop()
+
+
 # --- loading -------------------------------------------------------------------
 
+SHEET_REFRESH_SECONDS = 300
+
+
 def _stamp(source: str) -> float | None:
-    """Modification time for local files, so edits are picked up on rerun."""
-    return os.path.getmtime(source) if os.path.exists(source) else None
+    """Cache key: modification time for local files (edits are picked up on rerun);
+    a 5-minute time slot for links, so a shared sheet is re-read regularly."""
+    if os.path.exists(source):
+        return os.path.getmtime(source)
+    if source.startswith("http"):
+        return time.time() // SHEET_REFRESH_SECONDS
+    return None
 
 
 @st.cache_data(show_spinner=False)
@@ -55,19 +97,28 @@ def _signed(x: float) -> str:
 # --- sidebar -------------------------------------------------------------------
 
 st.sidebar.title("⚽ QET Football")
-data_source = st.sidebar.text_input(
-    "Match data (CSV path or Google Sheet link)",
-    os.environ.get("QET_DATA") or DEFAULT_DATA,
-)
-ratings_source = st.sidebar.text_input(
-    "Manual ratings file (loaded at start; 'Save' writes here)",
-    os.environ.get("QET_RATINGS") or DEFAULT_RATINGS,
-)
+if VIEWER:
+    # Shared version: the data source is fixed by the settings and never shown.
+    data_source = _setting("QET_DATA", DEFAULT_DATA)
+    ratings_source = _setting("QET_RATINGS")
+else:
+    data_source = st.sidebar.text_input(
+        "Match data (CSV path or Google Sheet link)", _setting("QET_DATA", DEFAULT_DATA)
+    )
+    ratings_source = st.sidebar.text_input(
+        "Manual ratings file (loaded at start; 'Save' writes here)",
+        _setting("QET_RATINGS", DEFAULT_RATINGS),
+    )
+if data_source.startswith("http") and st.sidebar.button("Reload data"):
+    _load_matches.clear()
 
 try:
     all_matches = _load_matches(data_source, _stamp(data_source))
 except Exception as e:  # shown to the user, not raised
-    st.error(f"Could not load matches from `{data_source}`: {e}")
+    where = "the match data" if VIEWER else f"`{data_source}`"
+    hint = (" Check the Google Sheet is shared as 'Anyone with the link can view'."
+            if data_source.startswith("http") else "")
+    st.error(f"Could not load matches from {where}: {e}.{hint}")
     st.stop()
 try:
     file_versions = (
@@ -163,11 +214,13 @@ def _ratings_editor() -> dict[str, dict[str, float]]:
         for i in range(MAX_VERSIONS)
     ]
 
+    keep_note = ("Ratings here are just for you and are lost when you reload the page."
+                 if VIEWER else "**Save** keeps them for next time.")
     st.markdown(
         "Rate players from **1 to 10**; **5.5 = average**, and an empty cell (shown as "
         "*None*) means not rated (counted as average). To clear a cell, select it and press "
-        "Delete. Edits apply to every tab straight away; **Save** keeps "
-        "them for next time. A version with no ratings is ignored. Add a player who isn't "
+        "Delete. Edits apply to every tab straight away. " + keep_note + " "
+        "A version with no ratings is ignored. Add a player who isn't "
         "in the matches with the + row at the bottom."
     )
     name_cols = st.columns(MAX_VERSIONS)
@@ -213,7 +266,7 @@ def _ratings_editor() -> dict[str, dict[str, float]]:
 
     summary = ", ".join(f"{v} ({len(sc)} players)" for v, sc in versions.items())
     st.caption(f"In use: {summary}" if summary else "No manual ratings in use.")
-    if st.button("Save to file", disabled=not ratings_source):
+    if not VIEWER and st.button("Save to file", disabled=not ratings_source):
         _save_ratings(ratings_source, versions)
         st.success(f"Saved to `{ratings_source}`.")
     return versions

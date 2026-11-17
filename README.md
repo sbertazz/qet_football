@@ -60,6 +60,27 @@ come from all included matches, that one too.
 The sidebar sets the data files, the ratings version and the model
 settings (alpha, cap, beta, hold).
 
+### Sharing it online (Streamlit Community Cloud)
+
+1. Make sure the Google Sheet is shared as **Anyone with the link can view**.
+2. Go to https://share.streamlit.io, sign in with GitHub, click **Create app** and pick
+   repo `sbertazz/qet_football`, branch `main`, main file `app.py`.
+3. Under **Advanced settings**, choose Python 3.11 or newer and paste into **Secrets**:
+
+   ```toml
+   QET_DATA = "https://docs.google.com/spreadsheets/d/<sheet id>/edit?gid=0"
+   QET_PASSWORD = "<pick a password>"
+   QET_VIEWER = "true"
+   ```
+
+4. Deploy, then share the app link and the password with the group.
+
+The shared app reads the sheet live (re-read every 5 minutes, or with **Reload data**),
+asks for the password first, and runs in viewer mode: no file paths and no saving.
+Anyone can still untick matches and enter manual ratings for their own session. Pushes
+to `main` redeploy it automatically. The same settings can go in a local, git-ignored
+`.streamlit/secrets.toml` or in environment variables.
+
 ## Match data
 
 Two layouts are accepted, detected automatically.

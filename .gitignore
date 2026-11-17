@@ -8,3 +8,5 @@ venv/
 # real match data stays local; only the sample is committed
 data/*.csv
 !data/sample_matches.csv
+# local Streamlit secrets (sheet link, password)
+.streamlit/secrets.toml

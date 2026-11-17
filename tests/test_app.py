@@ -77,3 +77,39 @@ def test_ratings_change_since_last_match_day(app):
     assert "new" not in changes
     assert any(c.startswith(("+", "-")) for c in changes)
     assert any("change from the last match day (2026-02-12" in c.value for c in app.caption)
+
+
+def _fresh_app():
+    return AppTest.from_file(str(ROOT / "app.py"), default_timeout=60)
+
+
+def test_password_gate(tmp_path, monkeypatch):
+    shutil.copy(ROOT / "data" / "sample_matches.csv", tmp_path / "matches.csv")
+    monkeypatch.setenv("QET_DATA", str(tmp_path / "matches.csv"))
+    monkeypatch.setenv("QET_PASSWORD", "secret")
+    at = _fresh_app().run()
+    assert not at.tabs  # nothing but the password box
+    at.text_input(key="password").set_value("wrong").run()
+    assert not at.tabs and at.error
+    at.text_input(key="password").set_value("secret").run()
+    assert not at.exception
+    assert [t.label for t in at.tabs][0] == "Ratings"
+
+
+def test_viewer_mode_hides_files_and_saving(tmp_path, monkeypatch):
+    shutil.copy(ROOT / "data" / "sample_matches.csv", tmp_path / "matches.csv")
+    monkeypatch.setenv("QET_DATA", str(tmp_path / "matches.csv"))
+    monkeypatch.setenv("QET_VIEWER", "true")
+    monkeypatch.delenv("QET_RATINGS", raising=False)
+    at = _fresh_app().run()
+    assert not at.exception
+    labels = [t.label for t in at.text_input]
+    assert not any("Match data" in label or "ratings file" in label for label in labels)
+    assert not any(b.label == "Save to file" for b in at.button)
+    assert at.sidebar.selectbox[0].options == ["Unadjusted"]  # no manual ratings to start
+
+
+def test_unreachable_sheet_shows_sharing_hint(tmp_path, monkeypatch):
+    monkeypatch.setenv("QET_DATA", "http://127.0.0.1:9/not-a-sheet")
+    at = _fresh_app().run()
+    assert at.error and "shared" in at.error[0].value
