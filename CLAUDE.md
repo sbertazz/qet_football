@@ -51,7 +51,10 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   table, up to 3 versions, edits apply immediately, Save overwrites the ratings file; extra
   file columns beyond 3 would be dropped, with a warning), Matches (Include checkbox per match,
   default ticked; unticked matches are left out of every tab; session only, resets on reload -
-  user's choice).
+  user's choice). Player contribution charts (Altair, diverging blue/red stacked bar per team,
+  segment positions computed in Python, net tick, expected score = usual goals per game split
+  around the expected difference) in Predict, Balance and Matches ("Show match" picker; past
+  matches use ratings fitted on all included matches, user's choice A, not leave-one-out).
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names; `tests/test_app.py` uses
   Streamlit's AppTest).
 
@@ -59,7 +62,7 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 - Last updated: 2026-11-17.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion in the app. 35 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion and player contribution charts in the app. 36 tests passing.
 - Data: 12 matches (Sep-Nov 2026), 23 players (incl. 10/11 and two games on 17/11, marked A/B
   in a 4th column; 0-7 and 4-3, much lower scoring - asked the user whether they were short
   games, no answer yet). With 12 matches LOO is 3.71 Unadjusted / 3.31 with Hamza 10 / Madhu 1,

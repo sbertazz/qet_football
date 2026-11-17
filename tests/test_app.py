@@ -55,3 +55,15 @@ def test_all_matches_included_by_default(app):
     caption = " ".join(c.value for c in app.sidebar.caption)
     assert caption.startswith("6 matches")
     assert not any("excluded" in i.value for i in app.info)
+
+
+def test_contribution_charts_render(app):
+    # Matches tab always shows the chart for the latest match.
+    assert len(app.get("vega_lite_chart")) == 1
+    players = ["Marco", "Luca", "Stefano", "Paolo", "Andrea", "Giorgio",
+               "Davide", "Matteo", "Simone", "Fabio", "Nicola", "Alberto"]
+    app.multiselect(key="pred_a_known").set_value(players[:6])
+    app.multiselect(key="pred_b_known").set_value(players[6:]).run()
+    assert not app.exception
+    assert len(app.get("vega_lite_chart")) == 2
+    assert any("Expected:" in m.value for m in app.markdown)

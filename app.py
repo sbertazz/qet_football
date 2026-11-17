@@ -14,6 +14,7 @@ import difflib
 import os
 from collections import Counter
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -266,6 +267,99 @@ def _prediction_rows(team_a: list[str], team_b: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# Contribution charts: diverging blue (adds goals) / red (costs goals), from the
+# dataviz reference palette; labels inside segments are white.
+POSITIVE, NEGATIVE = "#2a78d6", "#e34948"
+CHART_WIDTH = 640  # px, used to decide whether a name fits inside its segment
+GOALS_PER_GAME = (
+    sum(m.goals_a + m.goals_b for m in matches) / len(matches) if matches else 25.0
+)
+
+
+def _match_summary(team_a, team_b, model, names=("Team A", "Team B"), actual=None) -> str:
+    """One line: expected winner, margin, rough score, win/draw/loss, actual score."""
+    p = model.predict(team_a, team_b)
+    a_goals = GOALS_PER_GAME / 2 + p.goal_diff / 2
+    b_goals = GOALS_PER_GAME / 2 - p.goal_diff / 2
+    if abs(p.goal_diff) < 0.5:
+        head = "Expected: even game"
+    else:
+        leader = names[0] if p.goal_diff > 0 else names[1]
+        head = f"Expected: **{leader} by {abs(p.goal_diff):.1f}**"
+    text = (f"{head} (≈ {round(a_goals)}–{round(b_goals)}) · {names[0]} {p.p_win_a:.0%} · "
+            f"draw {p.p_draw:.0%} · {names[1]} {p.p_win_b:.0%}")
+    if actual is not None:
+        text += f" · **Actual: {actual[0]}–{actual[1]}**"
+    return text
+
+
+def _contribution_chart(team_a, team_b, model, names=("Team A", "Team B"), height=150):
+    """Stacked bar per team: each player's rating is a segment growing out from zero
+    (positives to the right, negatives to the left), so the team total is where the
+    two sides net out. Segment positions are computed here, not by Vega's stack."""
+    nets = [sum(model.rating(p) for p in t) for t in (team_a, team_b)]
+    names = [f"{n} · net {t:+.2f}" for n, t in zip(names, nets)]
+    rows = []
+    for team, players in zip(names, (team_a, team_b)):
+        rated = [(p, model.rating(p)) for p in players]
+        for sign in (1, -1):
+            edge = 0.0
+            side = sorted((pr for pr in rated if (pr[1] > 0 if sign > 0 else pr[1] < 0)),
+                          key=lambda pr: -abs(pr[1]))  # biggest contributors nearest zero
+            for p, r in side:
+                rows.append({"Team": team, "Player": p, "Rating": r, "start": edge,
+                             "end": edge + r, "mid": edge + r / 2,
+                             "Effect": "adds goals" if r > 0 else "costs goals",
+                             "Shown": f"{r:+.2f}"})
+                edge += r
+    df = pd.DataFrame(rows, columns=["Team", "Player", "Rating", "start", "end", "mid",
+                                     "Effect", "Shown"])
+    totals = pd.DataFrame({"Team": names, "Total": nets})
+    totals["Text"] = totals.Total.map(lambda t: f"{t:+.2f}")
+    extent = max([abs(v) for v in (*df.start, *df.end)] + [0.5]) * 1.1
+    px_per_goal = CHART_WIDTH / (2 * extent)
+    df["Label"] = [p if abs(r) * px_per_goal > 7 * len(p) + 12 else ""
+                   for p, r in zip(df.Player, df.Rating)]
+
+    x_scale = alt.Scale(domain=[-extent, extent])
+    y = alt.Y("Team:N", sort=list(names), title=None,
+              scale=alt.Scale(paddingInner=0.35, paddingOuter=0.2),
+              axis=alt.Axis(labelFontSize=13, labelFontWeight="bold", ticks=False, domain=False,
+                            labelLimit=260))
+    base = alt.Chart(df).encode(y=y)
+    bars = base.mark_bar(stroke="white", strokeWidth=2, cornerRadius=3).encode(
+        x=alt.X("start:Q", scale=x_scale,
+                title="Goals added per game vs an average player",
+                axis=alt.Axis(tickCount=8, gridOpacity=0.4)),
+        x2="end:Q",
+        color=alt.Color("Effect:N", scale=alt.Scale(domain=["adds goals", "costs goals"],
+                                                    range=[POSITIVE, NEGATIVE]),
+                        legend=alt.Legend(title=None, orient="top")),
+        tooltip=[alt.Tooltip("Team:N"), alt.Tooltip("Player:N"),
+                 alt.Tooltip("Shown:N", title="Rating (goals/game)")],
+    )
+    names_in_bars = base.transform_filter(alt.datum.Label != "").mark_text(
+        color="white", fontSize=12, fontWeight=500
+    ).encode(x=alt.X("mid:Q", scale=x_scale), text="Label:N")
+    zero = alt.Chart(pd.DataFrame({"x": [0.0]})).mark_rule(color="gray").encode(
+        x=alt.X("x:Q", scale=x_scale))
+    net = alt.Chart(totals).encode(y=y, x=alt.X("Total:Q", scale=x_scale))
+    net_tick = net.mark_tick(color="black", thickness=3, size=height / 2.6).encode(
+        tooltip=[alt.Tooltip("Team:N"), alt.Tooltip("Text:N", title="Team total")])
+    return (bars + names_in_bars + zero + net_tick).properties(height=height)
+
+
+def _show_contributions(team_a, team_b, model, names=("Team A", "Team B"), actual=None,
+                        height=150) -> None:
+    st.markdown(_match_summary(team_a, team_b, model, names, actual))
+    st.altair_chart(_contribution_chart(team_a, team_b, model, names, height),
+                    width="stretch", height=height + 110)
+    zero = [p for p in (*team_a, *team_b) if is_guest(p) or normalize_name(p) not in model.ratings]
+    st.caption("Each segment is one player: blue adds goals, red costs goals versus an average "
+               "player; the black tick is the team total (net). Hover a segment for details."
+               + (f" Counted as average (0): {', '.join(zero)}." if zero else ""))
+
+
 def _player_picker(label: str, key: str) -> list[str]:
     picked = st.multiselect(label, known_players, key=f"{key}_known")
     extra = st.text_input("Other players, comma separated (new players count as average)",
@@ -356,6 +450,7 @@ with tab_balance:
             b.markdown("**Team B**  \n" + "  \n".join(s.team_b))
             preds.dataframe(_prediction_rows(list(s.team_a), list(s.team_b)),
                             hide_index=True, width="stretch")
+            _show_contributions(list(s.team_a), list(s.team_b), models[version], height=120)
 
 # --- predict -------------------------------------------------------------------
 
@@ -373,6 +468,8 @@ with tab_predict:
                      width="stretch")
         st.caption("Win / draw / loss assume the real goal difference varies by about "
                    f"±{models[version].sigma:.1f} goals around the expectation.")
+        st.markdown(f"**Player contributions** ({version})")
+        _show_contributions(team_a, team_b, models[version])
     else:
         st.info("Pick players for both teams.")
 
@@ -436,3 +533,21 @@ with tab_eval:
             + (f" Only {len(matches)} matches: differences may just be luck."
                if len(matches) < 15 else "")
         )
+
+
+# --- matches: contribution chart (needs the fitted model, so it comes last) ---
+
+with tab_matches:
+    st.divider()
+    st.markdown(f"**Player contributions in a past match** ({version} ratings)")
+    labels = [f"{m.date or '#' + str(i + 1)} · {m.goals_a}-{m.goals_b} · "
+              f"{', '.join(m.team_a[:2])}… v {', '.join(m.team_b[:2])}…"
+              for i, m in enumerate(all_matches)]
+    chosen = st.selectbox("Show match", range(len(all_matches)), index=len(all_matches) - 1,
+                          format_func=lambda i: labels[i])
+    m = all_matches[chosen]
+    _show_contributions(list(m.team_a), list(m.team_b), models[version],
+                        names=("Left team", "Right team"), actual=(m.goals_a, m.goals_b))
+    st.caption("Ratings come from all included matches, this one too, so past matches look "
+               "more predictable than they were. The Evaluate tab shows the honest version."
+               + (" This match is excluded from the ratings." if m not in matches else ""))

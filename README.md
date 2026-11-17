@@ -52,7 +52,11 @@ together/apart, balance on one version or on all at once), **Predict**, **Evalua
 (leave-one-out and training set), **Manual ratings** (edit up to 3 versions in a
 table; edits apply at once, **Save** writes `data/player_ratings.csv`) and **Matches** (untick a match to leave it out of everything for this session; it resets
 on reload) (what was loaded, with a warning for
-similar names). The sidebar sets the data files, the ratings version and the model
+similar names). Predict, Balance and Matches also show a **player contribution chart**: one stacked bar
+per team, each player a segment (blue adds goals, red costs goals versus an average
+player), with the team total marked and an expected score. For past matches the ratings
+come from all included matches, that one too.
+The sidebar sets the data files, the ratings version and the model
 settings (alpha, cap, beta, hold).
 
 ## Match data
