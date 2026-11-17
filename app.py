@@ -82,8 +82,8 @@ match_players = sorted(
     {p for m in all_matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
 )
 
-tab_ratings, tab_balance, tab_predict, tab_eval, tab_manual, tab_matches = st.tabs(
-    ["Ratings", "Balance", "Predict", "Evaluate", "Manual ratings", "Matches"]
+tab_ratings, tab_matches, tab_manual, tab_balance, tab_predict, tab_eval = st.tabs(
+    ["Ratings", "Matches", "Manual ratings", "Balance", "Predict", "Evaluate"]
 )
 
 # --- matches -------------------------------------------------------------------
@@ -377,11 +377,27 @@ with tab_ratings:
     if excluded_note:
         st.info(excluded_note)
     unadjusted = models[NO_RATINGS]
+
+    # Change since before the last match day (all matches on the latest date).
+    dated = [m.date for m in matches if m.date]
+    last_day = max(dated) if dated else None
+    before = [m for m in matches if m.date != last_day] if last_day else matches[:-1]
+    previous = {v: RatingModel(**options).fit(before, s) for v, s in versions.items()}
+    played_before = previous[NO_RATINGS].games
+
+    def _change(v: str, p: str) -> str:
+        # Text, not numbers: st.dataframe would show a missing value as "None".
+        if unadjusted.games.get(p, 0) and not played_before.get(p, 0):
+            return "new"  # first games on the last match day
+        d = models[v].rating(p) - previous[v].rating(p)
+        return "–" if abs(d) < 0.005 else f"{d:+.2f}"
+
     table = pd.DataFrame(
         [
             {
                 "Player": p,
-                **{v: round(m.rating(p), 2) for v, m in models.items()},
+                **{col: val for v, m in models.items()
+                   for col, val in ((v, round(m.rating(p), 2)), (f"{v} Δ", _change(v, p)))},
                 "Games": unadjusted.games.get(p, 0),
                 "Won": unadjusted.won.get(p, 0.0),
                 "Your ratings": " · ".join(
@@ -398,8 +414,16 @@ with tab_ratings:
         return ["background-color: rgba(255, 200, 0, 0.25)" if p in rated else ""
                 for p in table.loc[column.index, "Player"]]
 
-    styled = table.style.apply(_highlight, subset=list(user_versions)).format(
-        {v: _signed for v in models} | {"Won": "{:.1f}"}
+    change_cols = [f"{v} Δ" for v in models]
+
+    def _change_colour(column: pd.Series) -> list[str]:
+        return ["color: #1a8a3a" if x.startswith("+") else "color: #c62828" if x.startswith("-")
+                else "" for x in column]
+
+    styled = (
+        table.style.apply(_highlight, subset=list(user_versions))
+        .apply(_change_colour, subset=change_cols)
+        .format({v: _signed for v in models} | {"Won": "{:.1f}"})
     )
     st.dataframe(styled, width="stretch", height=min(35 * (len(table) + 1) + 3, 900))
     notes = [f"**{v}**: {len(s)} players rated, 1 point = {models[v].beta:.2f} goals"
@@ -408,6 +432,9 @@ with tab_ratings:
         "Rating = goals a player adds to their team's goal difference per game versus an "
         "average player. Won counts a draw as 0.5. Highlighted cells = you rated that player "
         "in that version. Click a column header to sort."
+        + (f"  \nΔ = change from the last match day ({last_day}, "
+           f"{sum(m.date == last_day for m in matches)} match(es)); "
+           "\"new\" = first games that day." if last_day else "")
         + ("  \n" + "  \n".join(notes) if notes else "")
     )
 

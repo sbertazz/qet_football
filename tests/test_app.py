@@ -23,7 +23,7 @@ def app(tmp_path, monkeypatch):
 def test_app_renders_all_tabs(app):
     assert not app.exception
     assert [t.label for t in app.tabs] == [
-        "Ratings", "Balance", "Predict", "Evaluate", "Manual ratings", "Matches"
+        "Ratings", "Matches", "Manual ratings", "Balance", "Predict", "Evaluate"
     ]
 
 
@@ -67,3 +67,13 @@ def test_contribution_charts_render(app):
     assert not app.exception
     assert len(app.get("vega_lite_chart")) == 2
     assert any("Expected:" in m.value for m in app.markdown)
+
+
+def test_ratings_change_since_last_match_day(app):
+    table = app.dataframe[0].value
+    assert list(table.columns[:5]) == ["Player", "Unadjusted", "Unadjusted Δ", "mine", "mine Δ"]
+    # Sample data: the last match day (2026-02-12) is one match; everyone played before it.
+    changes = list(table["Unadjusted Δ"])
+    assert "new" not in changes
+    assert any(c.startswith(("+", "-")) for c in changes)
+    assert any("change from the last match day (2026-02-12" in c.value for c in app.caption)

@@ -47,7 +47,8 @@ streamlit run app.py
 ```
 
 Opens in your browser at http://localhost:8501 and runs only on your machine. Tabs:
-**Ratings** (sortable; cells you rated are highlighted), **Balance** (pick players,
+**Ratings** (sortable; cells you rated are highlighted; a Δ column per version shows the
+change from the last match day, "new" for players whose first games were that day), **Balance** (pick players,
 together/apart, balance on one version or on all at once), **Predict**, **Evaluate**
 (leave-one-out and training set), **Manual ratings** (edit up to 3 versions in a
 table; edits apply at once, **Save** writes `data/player_ratings.csv`) and **Matches** (untick a match to leave it out of everything for this session; it resets
