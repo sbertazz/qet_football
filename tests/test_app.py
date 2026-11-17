@@ -49,3 +49,9 @@ def test_rename_and_save_ratings(app, tmp_path):
     assert not app.exception
     saved = (tmp_path / "ratings.csv").read_text().splitlines()
     assert saved == ["player,my view", "Andrea,9", "Fabio,1"]
+
+
+def test_all_matches_included_by_default(app):
+    caption = " ".join(c.value for c in app.sidebar.caption)
+    assert caption.startswith("6 matches")
+    assert not any("excluded" in i.value for i in app.info)

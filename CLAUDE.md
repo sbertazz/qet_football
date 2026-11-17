@@ -49,16 +49,21 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   phone/hosted). Display only: reuses the package, no model logic of its own. Tabs Ratings,
   Balance (incl. "most even across all versions"), Predict, Evaluate, Manual ratings (editable
   table, up to 3 versions, edits apply immediately, Save overwrites the ratings file; extra
-  file columns beyond 3 would be dropped, with a warning), Matches.
+  file columns beyond 3 would be dropped, with a warning), Matches (Include checkbox per match,
+  default ticked; unticked matches are left out of every tab; session only, resets on reload -
+  user's choice).
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names; `tests/test_app.py` uses
   Streamlit's AppTest).
 
 ## Status
 
-- Last updated: 2026-11-14 (later).
+- Last updated: 2026-11-17.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5. 34 tests passing.
-- Data: 9 matches (Sep-Nov 2026), 20 players. Nas, Nasri, Nasaar are different people (user
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion in the app. 35 tests passing.
+- Data: 12 matches (Sep-Nov 2026), 23 players (incl. 10/11 and two games on 17/11, marked A/B
+  in a 4th column; 0-7 and 4-3, much lower scoring - asked the user whether they were short
+  games, no answer yet). With 12 matches LOO is 3.71 Unadjusted / 3.31 with Hamza 10 / Madhu 1,
+  vs 2.58 always-draw. Nas, Nasri, Nasaar are different people (user
   confirmed; sheet later fixed Nasaar->Nas on 6/10, Umer->Umar). Sheet spells Abderrahmane;
   user sometimes types Abdderahmane. Manual ratings: 3 versions, 4-5 players.
 - 03/11 (16-10) is a big upset, confirmed legit by the user. With it, leave-one-out is worse

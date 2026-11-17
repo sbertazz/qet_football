@@ -64,7 +64,7 @@ ratings_source = st.sidebar.text_input(
 )
 
 try:
-    matches = _load_matches(data_source, _stamp(data_source))
+    all_matches = _load_matches(data_source, _stamp(data_source))
 except Exception as e:  # shown to the user, not raised
     st.error(f"Could not load matches from `{data_source}`: {e}")
     st.stop()
@@ -78,16 +78,59 @@ except Exception as e:
     st.stop()
 
 match_players = sorted(
-    {p for m in matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
+    {p for m in all_matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
 )
 
 tab_ratings, tab_balance, tab_predict, tab_eval, tab_manual, tab_matches = st.tabs(
     ["Ratings", "Balance", "Predict", "Evaluate", "Manual ratings", "Matches"]
 )
 
+# --- matches -------------------------------------------------------------------
+# Rendered before the model (its tab is further right) so the Include ticks apply
+# to every other tab on the same run. Exclusions last for this browser session.
+
+with tab_matches:
+    picked = st.data_editor(
+        pd.DataFrame(
+            [
+                {"Include": True, "Date": m.date, "Left team": ", ".join(m.team_a),
+                 "Score": f"{m.goals_a}-{m.goals_b}", "Right team": ", ".join(m.team_b)}
+                for m in all_matches
+            ]
+        ),
+        key="match_picker",
+        hide_index=True,
+        width="stretch",
+        height=min(35 * (len(all_matches) + 1) + 3, 900),
+        disabled=["Date", "Left team", "Score", "Right team"],
+        column_config={"Include": st.column_config.CheckboxColumn(
+            "Include", help="Untick to leave this match out of every tab", default=True)},
+    )
+    matches = [m for m, keep in zip(all_matches, picked["Include"]) if keep]
+    n_excluded = len(all_matches) - len(matches)
+    st.caption(
+        "Untick a match to leave it out of ratings, balance, predictions and evaluation. "
+        "Exclusions reset when you reload the page."
+        + (f" **{n_excluded} excluded.**" if n_excluded else "")
+    )
+    games = Counter(p for m in all_matches for p in (*m.team_a, *m.team_b) if not is_guest(p))
+    similar = sorted(
+        {tuple(sorted((p, q))) for p in games
+         for q in difflib.get_close_matches(p, games, n=3, cutoff=0.8) if q != p}
+    )
+    if similar:
+        st.warning("Similar names, check they're really different people: "
+                   + "; ".join(f"{p} / {q}" for p, q in similar))
+    st.caption("Players and games (all matches): "
+               + ", ".join(f"{p} ({n})" for p, n in sorted(games.items())))
+
+excluded_note = (
+    f"{n_excluded} of {len(all_matches)} matches excluded (see the Matches tab)."
+    if n_excluded else ""
+)
+
 # --- manual ratings ------------------------------------------------------------
-# Rendered first (its tab is further right) so edits apply to every other tab
-# on the same run.
+# Also rendered before the model, so edits apply to every other tab on the same run.
 
 MAX_VERSIONS = 3
 SLOTS = [f"v{i + 1}" for i in range(MAX_VERSIONS)]
@@ -200,7 +243,8 @@ with st.sidebar.expander("Model settings"):
 options = {"alpha": alpha, "cap": cap, "beta": beta, "hold": hold}
 
 st.sidebar.caption(
-    f"{len(matches)} matches · "
+    (f"{len(matches)} of {len(all_matches)} matches used ({n_excluded} excluded) · "
+     if n_excluded else f"{len(matches)} matches · ")
     + (f"rating versions: {', '.join(user_versions)}" if user_versions else "no manual ratings")
 )
 
@@ -236,6 +280,8 @@ def _player_picker(label: str, key: str) -> list[str]:
 # --- ratings -------------------------------------------------------------------
 
 with tab_ratings:
+    if excluded_note:
+        st.info(excluded_note)
     unadjusted = models[NO_RATINGS]
     table = pd.DataFrame(
         [
@@ -333,6 +379,8 @@ with tab_predict:
 # --- evaluate ------------------------------------------------------------------
 
 with tab_eval:
+    if excluded_note:
+        st.info(excluded_note)
     if len(matches) < 2:
         st.info("Need at least 2 matches to evaluate.")
     else:
@@ -388,27 +436,3 @@ with tab_eval:
             + (f" Only {len(matches)} matches: differences may just be luck."
                if len(matches) < 15 else "")
         )
-
-# --- matches -------------------------------------------------------------------
-
-with tab_matches:
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Date": m.date, "Left team": ", ".join(m.team_a),
-                 "Score": f"{m.goals_a}-{m.goals_b}", "Right team": ", ".join(m.team_b)}
-                for m in matches
-            ]
-        ),
-        hide_index=True, width="stretch",
-    )
-    games = Counter(p for m in matches for p in (*m.team_a, *m.team_b) if not is_guest(p))
-    similar = sorted(
-        {tuple(sorted((p, q))) for p in games
-         for q in difflib.get_close_matches(p, games, n=3, cutoff=0.8) if q != p}
-    )
-    if similar:
-        st.warning("Similar names, check they're really different people: "
-                   + "; ".join(f"{p} / {q}" for p, q in similar))
-    st.caption("Players and games: "
-               + ", ".join(f"{p} ({n})" for p, n in sorted(games.items())))
