@@ -23,7 +23,7 @@ def app(tmp_path, monkeypatch):
 def test_app_renders_all_tabs(app):
     assert not app.exception
     assert [t.label for t in app.tabs] == [
-        "Ratings", "Matches", "Manual ratings", "Balance", "Predict", "Evaluate"
+        "Ratings", "Matches", "Player", "Manual ratings", "Balance", "Predict", "Evaluate"
     ]
 
 
@@ -58,14 +58,14 @@ def test_all_matches_included_by_default(app):
 
 
 def test_contribution_charts_render(app):
-    # Matches tab always shows the chart for the latest match.
-    assert len(app.get("vega_lite_chart")) == 1
+    # Matches tab (latest match) and Player tab always show a chart.
+    assert len(app.get("vega_lite_chart")) == 2
     players = ["Marco", "Luca", "Stefano", "Paolo", "Andrea", "Giorgio",
                "Davide", "Matteo", "Simone", "Fabio", "Nicola", "Alberto"]
     app.multiselect(key="pred_a_known").set_value(players[:6])
     app.multiselect(key="pred_b_known").set_value(players[6:]).run()
     assert not app.exception
-    assert len(app.get("vega_lite_chart")) == 2
+    assert len(app.get("vega_lite_chart")) == 3
     assert any("Expected:" in m.value for m in app.markdown)
     # Text version of the chart, one line per team with net total and players best first.
     team_lines = [m.value for m in app.markdown if m.value.startswith("**Team A · net")]
@@ -116,3 +116,12 @@ def test_unreachable_sheet_shows_sharing_hint(tmp_path, monkeypatch):
     monkeypatch.setenv("QET_DATA", "http://127.0.0.1:9/not-a-sheet")
     at = _fresh_app().run()
     assert at.error and "shared" in at.error[0].value
+
+
+def test_player_tab_lists_his_matches_with_effects(app):
+    app.selectbox(key="player_pick").set_value("Marco").run()
+    assert not app.exception
+    table = next(d.value for d in app.dataframe if "Effect on rating" in d.value.columns)
+    assert len(table) == 6  # Marco played all 6 sample matches
+    assert set(table["Result"]) <= {"W", "D", "L"}
+    assert table["Effect on rating"].abs().sum() > 0

@@ -133,8 +133,8 @@ match_players = sorted(
     {p for m in all_matches for p in (*m.team_a, *m.team_b) if not is_guest(p)}
 )
 
-tab_ratings, tab_matches, tab_manual, tab_balance, tab_predict, tab_eval = st.tabs(
-    ["Ratings", "Matches", "Manual ratings", "Balance", "Predict", "Evaluate"]
+tab_ratings, tab_matches, tab_player, tab_manual, tab_balance, tab_predict, tab_eval = st.tabs(
+    ["Ratings", "Matches", "Player", "Manual ratings", "Balance", "Predict", "Evaluate"]
 )
 
 # --- matches -------------------------------------------------------------------
@@ -640,14 +640,138 @@ with tab_eval:
 with tab_matches:
     st.divider()
     st.markdown(f"**Player contributions in a past match** ({version} ratings)")
-    labels = [f"{m.date or '#' + str(i + 1)} · {m.goals_a}-{m.goals_b} · "
+    pick_labels = [f"{m.date or '#' + str(i + 1)} · {m.goals_a}-{m.goals_b} · "
               f"{', '.join(m.team_a[:2])}… v {', '.join(m.team_b[:2])}…"
               for i, m in enumerate(all_matches)]
     chosen = st.selectbox("Show match", range(len(all_matches)), index=len(all_matches) - 1,
-                          format_func=lambda i: labels[i])
+                          format_func=lambda i: pick_labels[i])
     m = all_matches[chosen]
     _show_contributions(list(m.team_a), list(m.team_b), models[version],
                         names=("Left team", "Right team"), actual=(m.goals_a, m.goals_b))
     st.caption("Ratings come from all included matches, this one too, so past matches look "
                "more predictable than they were. The Evaluate tab shows the honest version."
                + (" This match is excluded from the ratings." if m not in matches else ""))
+
+
+# --- player --------------------------------------------------------------------
+
+def _match_labels(ms) -> list[str]:
+    """dd/mm labels; matches on the same day get A, B, ..."""
+    per_day = Counter(m.date for m in ms)
+    seen: Counter = Counter()
+    labels = []
+    for m in ms:
+        day = f"{m.date[8:10]}/{m.date[5:7]}" if m.date and len(m.date) == 10 else (m.date or "?")
+        seen[m.date] += 1
+        labels.append(day + (f" {chr(64 + seen[m.date])}" if per_day[m.date] > 1 else ""))
+    return labels
+
+
+with tab_player:
+    unadjusted = models[NO_RATINGS]
+    playing = [p for p in known_players if unadjusted.games.get(p, 0)]
+    if not playing:
+        st.info("No matches included.")
+    else:
+        model = models[version]
+        ranking = sorted(model.ratings, key=model.rating, reverse=True)
+        default = playing.index(ranking[0]) if ranking[0] in playing else 0
+        player = st.selectbox("Player", playing, index=default, key="player_pick")
+        rating = model.rating(player)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(f"Rating ({version})", f"{rating:+.2f}")
+        c2.metric("Rank", f"{ranking.index(player) + 1} of {len(ranking)}")
+        c3.metric("Games", unadjusted.games.get(player, 0))
+        c4.metric("Won", f"{unadjusted.won.get(player, 0.0):g}")
+
+        # Effect of each match: rating with everything minus rating without that match.
+        scores = versions[version]
+        order = sorted(range(len(matches)), key=lambda i: (matches[i].date or "", i))
+        day_labels = dict(zip(order, _match_labels([matches[i] for i in order])))
+        without = {
+            i: RatingModel(**options).fit([*matches[:i], *matches[i + 1:]], scores)
+            for i in order
+        }
+        effect = {i: rating - without[i].rating(player) for i in order}
+        played = [i for i in order if player in (*matches[i].team_a, *matches[i].team_b)]
+
+        rows = []
+        for i in played:
+            m = matches[i]
+            on_left = player in m.team_a
+            mine, theirs = (m.team_a, m.team_b) if on_left else (m.team_b, m.team_a)
+            diff = m.goal_diff if on_left else -m.goal_diff
+            expected = without[i].predict(mine, theirs).goal_diff
+            score = (f"{m.goals_a}-{m.goals_b}" if on_left else f"{m.goals_b}-{m.goals_a}")
+            rows.append({
+                "Match": day_labels[i],
+                "Score (his side first)": score,
+                "Result": "W" if diff > 0 else "D" if diff == 0 else "L",
+                "Expected": f"{expected:+.1f}",
+                "Effect on rating": round(effect[i], 2),
+                "Teammates": ", ".join(p for p in mine if p != player),
+                "Opponents": ", ".join(theirs),
+            })
+        table = pd.DataFrame(rows)
+
+        chart_df = pd.DataFrame({
+            "Match": [day_labels[i] for i in played],
+            "Effect": [effect[i] for i in played],
+            "Shown": [f"{effect[i]:+.2f}" for i in played],
+            "Direction": ["raised" if effect[i] >= 0 else "lowered" for i in played],
+        })
+        st.markdown(f"**How each of {player}'s matches moved his rating**")
+        st.altair_chart(
+            alt.Chart(chart_df).mark_bar(cornerRadius=3).encode(
+                x=alt.X("Match:N", sort=None, title=None, axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("Effect:Q", title="Effect on rating (goals/game)"),
+                color=alt.Color("Direction:N",
+                                scale=alt.Scale(domain=["raised", "lowered"],
+                                                range=[POSITIVE, NEGATIVE]),
+                                legend=alt.Legend(title=None, orient="top")),
+                tooltip=["Match:N", alt.Tooltip("Shown:N", title="Effect")],
+            ).properties(height=220),
+            width="stretch",
+        )
+
+        def _effect_colour(column: pd.Series) -> list[str]:
+            return ["color: #1a8a3a" if x > 0.005 else "color: #c62828" if x < -0.005 else ""
+                    for x in column]
+
+        st.dataframe(
+            table.style.apply(_effect_colour, subset=["Effect on rating"])
+            .format({"Effect on rating": _signed}),
+            hide_index=True, width="stretch",
+        )
+        st.caption(
+            "Effect on rating = his rating now minus his rating if that match were left out. "
+            "A match raises it when his team did better than expected (Expected = goal "
+            "difference the model predicted for his side without that match), and lowers it "
+            "when they did worse. Effects interact, so they add up to roughly, not exactly, "
+            "his rating."
+        )
+
+        others = sorted((i for i in order if i not in played), key=lambda i: -abs(effect[i]))[:3]
+        others = [i for i in others if abs(effect[i]) >= 0.005]
+        if others:
+            together = Counter(q for m in matches if player in m.team_a or player in m.team_b
+                               for q in (m.team_a if player in m.team_a else m.team_b))
+            against = Counter(q for m in matches if player in m.team_a or player in m.team_b
+                              for q in (m.team_b if player in m.team_a else m.team_a))
+            lines = []
+            for i in others:
+                m = matches[i]
+                in_match = [*m.team_a, *m.team_b]
+                mates = [q for q in in_match if together.get(q, 0) and q != player]
+                foes = [q for q in in_match if against.get(q, 0)]
+                links = sorted(set(mates) | set(foes),
+                               key=lambda q: -(together.get(q, 0) + against.get(q, 0)))[:3]
+                value = f":green[{effect[i]:+.2f}]" if effect[i] > 0 else f":red[{effect[i]:+.2f}]"
+                lines.append(
+                    f"- **{day_labels[i]}** ({m.goals_a}-{m.goals_b}) {value} — via "
+                    + ", ".join(f"{q} (with him {together.get(q, 0)}×, against "
+                                f"{against.get(q, 0)}×)" for q in links)
+                )
+            st.markdown(f"**Biggest effects from matches {player} didn't play**  \n"
+                        "They move his rating by changing how good his usual teammates and "
+                        "opponents look.\n" + "\n".join(lines))

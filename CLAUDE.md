@@ -53,7 +53,9 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   every 5 minutes (+ Reload data button). Deploy steps in README. Display only: reuses the package, no model logic of its own. Tab order (user's
   choice): Ratings (with a "<version> Δ" text column per version = change from the last match
   day, all matches on the latest date; refit without them; "new" = first games that day),
-  then Matches, Manual ratings, Balance, Predict, Evaluate. Tabs: Ratings,
+  then Matches, Player (per-match effect on a player's rating = rating minus rating refitted
+  without that match; table with result, expected from his side, teammates/opponents; bar
+  chart; top-3 effects from matches he didn't play), Manual ratings, Balance, Predict, Evaluate. Tabs: Ratings,
   Balance (incl. "most even across all versions"), Predict, Evaluate, Manual ratings (editable
   table, up to 3 versions, edits apply immediately, Save overwrites the ratings file; extra
   file columns beyond 3 would be dropped, with a warning), Matches (Include checkbox per match,
@@ -70,8 +72,8 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
 
 - Last updated: 2026-11-18.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
-  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion and player contribution charts and last-match-day rating change in the app, password + viewer mode for Streamlit Cloud.
-  40 tests passing.
+  as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion and player contribution charts and last-match-day rating change in the app, password + viewer mode for Streamlit Cloud, Player tab.
+  41 tests passing.
 - Data: 12 matches (Sep-Nov 2026), 23 players (incl. 10/11 and two games on 17/11, marked A/B
   in a 4th column; 0-7 and 4-3, much lower scoring - asked the user whether they were short
   games, no answer yet). With 12 matches LOO is 3.71 Unadjusted / 3.31 with Hamza 10 / Madhu 1,
