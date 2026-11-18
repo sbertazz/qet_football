@@ -323,7 +323,10 @@ def _prediction_rows(team_a: list[str], team_b: list[str]) -> pd.DataFrame:
 # Contribution charts: diverging blue (adds goals) / red (costs goals), from the
 # dataviz reference palette; labels inside segments are white.
 POSITIVE, NEGATIVE = "#2a78d6", "#e34948"
-CHART_WIDTH = 640  # px, used to decide whether a name fits inside its segment
+# Assumed plot width (px) when deciding whether a name fits inside its segment. Kept
+# phone-sized: the app can't see the screen width, and every name is also listed in
+# text under the chart.
+CHART_WIDTH = 300
 GOALS_PER_GAME = (
     sum(m.goals_a + m.goals_b for m in matches) / len(matches) if matches else 25.0
 )
@@ -402,11 +405,28 @@ def _contribution_chart(team_a, team_b, model, names=("Team A", "Team B"), heigh
     return (bars + names_in_bars + zero + net_tick).properties(height=height)
 
 
+def _contribution_text(team_a, team_b, model, names=("Team A", "Team B")) -> None:
+    """The chart's numbers as text, readable on a phone: one line per team, best first.
+    Columns sit side by side on a wide screen and stack on a narrow one."""
+    for col, name, team in zip(st.columns(2), names, (team_a, team_b)):
+        def entry(p: str) -> str:
+            known = normalize_name(p) in model.ratings and not is_guest(p)
+            r = model.rating(p)
+            value = (f":green[{r:+.2f}]" if r > 0.005 else f":red[{r:+.2f}]" if r < -0.005
+                     else "0.00")
+            return f"{p} {value}" + ("" if known else " (new)")
+
+        ranked = sorted(team, key=model.rating, reverse=True)
+        net = sum(model.rating(p) for p in team)
+        col.markdown(f"**{name} · net {net:+.2f}**  \n" + " · ".join(entry(p) for p in ranked))
+
+
 def _show_contributions(team_a, team_b, model, names=("Team A", "Team B"), actual=None,
                         height=150) -> None:
     st.markdown(_match_summary(team_a, team_b, model, names, actual))
     st.altair_chart(_contribution_chart(team_a, team_b, model, names, height),
                     width="stretch", height=height + 110)
+    _contribution_text(team_a, team_b, model, names)
     zero = [p for p in (*team_a, *team_b) if is_guest(p) or normalize_name(p) not in model.ratings]
     st.caption("Each segment is one player: blue adds goals, red costs goals versus an average "
                "player; the black tick is the team total (net). Hover a segment for details."

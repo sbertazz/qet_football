@@ -55,7 +55,8 @@ table; edits apply at once, **Save** writes `data/player_ratings.csv`) and **Mat
 on reload) (what was loaded, with a warning for
 similar names). Predict, Balance and Matches also show a **player contribution chart**: one stacked bar
 per team, each player a segment (blue adds goals, red costs goals versus an average
-player), with the team total marked and an expected score. For past matches the ratings
+player), with the team total marked and an expected score. Underneath, the same numbers as text (one
+line per team, best player first) for small screens. For past matches the ratings
 come from all included matches, that one too.
 The sidebar sets the data files, the ratings version and the model
 settings (alpha, cap, beta, hold).

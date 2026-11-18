@@ -60,14 +60,15 @@ group's name). 20-25 people rotate; teams change every game. See README.md.
   default ticked; unticked matches are left out of every tab; session only, resets on reload -
   user's choice). Player contribution charts (Altair, diverging blue/red stacked bar per team,
   segment positions computed in Python, net tick, expected score = usual goals per game split
-  around the expected difference) in Predict, Balance and Matches ("Show match" picker; past
+  around the expected difference; text breakdown per team below each chart for phones; in-bar
+  names only when they'd fit at phone width) in Predict, Balance and Matches ("Show match" picker; past
   matches use ratings fitted on all included matches, user's choice A, not leave-one-out).
 - Tests: `pytest` (fixture in `tests/data/blocks.csv` uses fake names; `tests/test_app.py` uses
   Streamlit's AppTest).
 
 ## Status
 
-- Last updated: 2026-11-17.
+- Last updated: 2026-11-18.
 - Built: ratings, match predictor, team balancer, block-layout loader, manual 1-10 ratings
   as prior (multiple versions), leave-one-out `evaluate` (leave-one-out + training set), goal-difference cap, fixed beta/hold, Streamlit web app with ratings editor, rating midpoint fixed at 5.5, match exclusion and player contribution charts and last-match-day rating change in the app, password + viewer mode for Streamlit Cloud.
   40 tests passing.

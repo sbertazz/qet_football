@@ -67,6 +67,9 @@ def test_contribution_charts_render(app):
     assert not app.exception
     assert len(app.get("vega_lite_chart")) == 2
     assert any("Expected:" in m.value for m in app.markdown)
+    # Text version of the chart, one line per team with net total and players best first.
+    team_lines = [m.value for m in app.markdown if m.value.startswith("**Team A · net")]
+    assert team_lines and all(p in team_lines[-1] for p in players[:6])
 
 
 def test_ratings_change_since_last_match_day(app):
